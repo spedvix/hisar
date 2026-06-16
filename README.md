@@ -25,12 +25,13 @@ This repository currently contains the **front-end client** (React + Vite). It r
 
 ## Screenshots
 
-Run `npm run dev` and log in to explore. Both **dark** (default) and **light** appearances ship; toggle via the **View** menu or the Appearance icon in the dock.
+<div align="center">
 
-<!-- Drop captures into docs/ and reference them here, e.g.:
-![Desktop — dark](docs/desktop-dark.png)
-![Finder + Quick Look](docs/finder.png)
--->
+![H.İ.S.A.R. desktop](hisar_preview.png)
+
+</div>
+
+Both **dark** (default) and **light** appearances ship; toggle via the **View** menu or the Appearance icon in the dock.
 
 ## Features
 
