@@ -1,4 +1,209 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext } from "react";
+
+const LanguageContext = createContext();
+export const useLanguage = () => useContext(LanguageContext);
+
+const TRANSLATIONS = {
+  en: {
+    // Menubar
+    about_reserve: "About This Reserve",
+    system_settings: "System Settings…",
+    lock_screen: "Lock Screen",
+    log_out: "Log Out",
+    about_finder: "About Finder",
+    preferences: "Preferences…",
+    empty_trash: "Empty Trash…",
+    new_folder: "New Folder",
+    untitled_folder: "untitled folder",
+    find: "Find…",
+    light_appearance: "Switch to Light Appearance",
+    dark_appearance: "Switch to Dark Appearance",
+    show_spotlight: "Show Spotlight",
+    file: "File",
+    edit: "Edit",
+    view: "View",
+    go: "Go",
+    
+    // Sidebar
+    favorites: "Favorites",
+    sidebar: "Sidebar",
+    get_info: "Get Info",
+    upload: "Upload",
+    search: "Search",
+    tags: "Tags",
+    red: "Red",
+    orange: "Orange",
+    green: "Green",
+    blue: "Blue",
+
+    // Folders
+    home: "Home",
+    documents: "Documents",
+    media: "Media",
+    projects: "Projects",
+    transfers: "Transfers",
+    reserve: "Reserve",
+
+    // Finder Area
+    no_matching_items: "No matching items.",
+    empty_folder: "This folder is empty. Drop files here to upload.",
+    name: "Name",
+    size: "Size",
+    modified: "Modified",
+    item: "item",
+    items: "items",
+    selected: "selected",
+    drop_to_upload: "Drop to upload",
+
+    // Info Panel
+    kind: "Kind",
+    folder: "Folder",
+    document: "document",
+    where: "Where",
+
+    // Context Menu
+    open: "Open",
+    quick_look: "Quick Look",
+    rename: "Rename…",
+    upload_here: "Upload Here…",
+    move_to_trash: "Move to Trash",
+    upload_files: "Upload Files…",
+    view_as_list: "View as List",
+    view_as_icons: "View as Icons",
+    open_new_window: "Open in New Window",
+
+    // Dialogs
+    dialog_new_folder_title: "New Folder",
+    dialog_new_folder_desc: "Name of new folder inside ",
+    dialog_rename_title: "Rename",
+    dialog_rename_desc: "Enter a new name for “{name}”",
+    create: "Create",
+    cancel: "Cancel",
+
+    // Quick Look
+    no_preview: "No preview available",
+
+    // TextEdit
+    empty_file: "(empty file)",
+
+    // Spotlight
+    spotlight_search: "Spotlight Search",
+    no_results: "No results for “{query}”",
+
+    // Dock
+    dock_finder: "Finder",
+    dock_terminal: "Terminal",
+    dock_textedit: "TextEdit",
+    dock_appearance: "Appearance",
+    dock_trash: "Trash",
+
+    // Login
+    enter_password: "Enter Password",
+    password_required: "Password required",
+    touch_id_or_password: "Touch ID or Enter Password",
+    appName_subtitle: "Fast Communication Storage and Transfer Reserve",
+  },
+  tr: {
+    // Menubar
+    about_reserve: "Bu Rezerv Hakkında",
+    system_settings: "Sistem Ayarları…",
+    lock_screen: "Ekranı Kilitle",
+    log_out: "Çıkış Yap",
+    about_finder: "Finder Hakkında",
+    preferences: "Tercihler…",
+    empty_trash: "Çöpü Boşalt…",
+    new_finder_window: "Yeni Finder Penceresi",
+    new_folder: "Yeni Klasör",
+    untitled_folder: "adsız klasör",
+    find: "Bul…",
+    light_appearance: "Açık Görünüme Geç",
+    dark_appearance: "Koyu Görünüme Geç",
+    show_spotlight: "Spotlight'ı Göster",
+    file: "Dosya",
+    edit: "Düzen",
+    view: "Görüntü",
+    go: "Git",
+    
+    // Sidebar
+    favorites: "Favoriler",
+    sidebar: "Kenar Çubuğu",
+    get_info: "Bilgi Al",
+    upload: "Yükle",
+    search: "Ara",
+    tags: "Etiketler",
+    red: "Kırmızı",
+    orange: "Turuncu",
+    green: "Yeşil",
+    blue: "Mavi",
+
+    // Folders
+    home: "Ev",
+    documents: "Belgeler",
+    media: "Medya",
+    projects: "Projeler",
+    transfers: "Aktarımlar",
+    reserve: "Rezerv",
+
+    // Finder Area
+    no_matching_items: "Eşleşen öge bulunamadı.",
+    empty_folder: "Bu klasör boş. Yüklemek için dosyaları buraya sürükleyin.",
+    name: "Ad",
+    size: "Boyut",
+    modified: "Değiştirilme",
+    item: "öge",
+    items: "öge",
+    selected: "seçildi",
+    drop_to_upload: "Yüklemek için sürükleyin",
+
+    // Info Panel
+    kind: "Tür",
+    folder: "Klasör",
+    document: "belgesi",
+    where: "Konum",
+
+    // Context Menu
+    open: "Aç",
+    quick_look: "Hızlı Bakış",
+    rename: "Yeniden Adlandır…",
+    upload_here: "Buraya Yükle…",
+    move_to_trash: "Çöp Kutusuna Taşı",
+    upload_files: "Dosya Yükle…",
+    view_as_list: "Liste Olarak Görüntüle",
+    view_as_icons: "Simge Olarak Görüntüle",
+    open_new_window: "Yeni Pencerede Aç",
+
+    // Dialogs
+    dialog_new_folder_title: "Yeni Klasör",
+    dialog_new_folder_desc: "Şunun içindeki yeni klasörün adı: ",
+    dialog_rename_title: "Yeniden Adlandır",
+    dialog_rename_desc: "“{name}” için yeni bir ad girin",
+    create: "Oluştur",
+    cancel: "İptal",
+
+    // Quick Look
+    no_preview: "Önizleme mevcut değil",
+
+    // TextEdit
+    empty_file: "(boş dosya)",
+
+    // Spotlight
+    spotlight_search: "Spotlight Arama",
+    no_results: "“{query}” için sonuç bulunamadı",
+
+    // Dock
+    dock_finder: "Finder",
+    dock_terminal: "Terminal",
+    dock_textedit: "TextEdit",
+    dock_appearance: "Görünüm",
+    dock_trash: "Çöp Kutusu",
+
+    // Login
+    enter_password: "Şifre Girin",
+    password_required: "Şifre gerekli",
+    touch_id_or_password: "Touch ID veya Şifre Girin",
+    appName_subtitle: "Hızlı İletişim Saklama ve Aktarım Rezervi",
+  }
+};
 
 /* ════════════════════════════════════════════════════════════════════════
    H.İ.S.A.R. — Hızlı İletişim Saklama ve Aktarım Rezervi
@@ -103,12 +308,20 @@ const ArcReactor = ({ s = 15 }) => (
   </svg>
 );
 
-// Stark amber folder (Stark convention: folders are amber)
+// Stark tech folder icon — fluid glass tabbed folder with corrected aspect ratio
 const FolderIcon = ({ s = 30 }) => (
-  <svg width={s} height={s} viewBox="0 0 64 52" aria-hidden style={{ display: "block" }}>
-    <path d="M5 8a4 4 0 0 1 4-4h15l6 6h25a4 4 0 0 1 4 4v6H5z" fill="#A06F24" />
-    <path d="M3 18a4 4 0 0 1 4-4h50a4 4 0 0 1 4 4v26a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4z" fill="#D99C44" />
-    <path d="M3 18a4 4 0 0 1 4-4h50a4 4 0 0 1 4 4v3H3z" fill="#fff" opacity=".22" />
+  <svg width={s} height={Math.round(s * 52 / 64)} viewBox="0 0 64 52" aria-hidden style={{ display: "block" }}>
+    {/* Folder back tab (open path at bottom to avoid overlapping wireframe stroke inside the glass body) */}
+    <path d="M6 17V10a3 3 0 0 1 3-3h12l4 4h32a3 3 0 0 1 3 3v3" fill="rgba(54,171,202,0.08)" stroke="var(--dock-gly)" strokeWidth="1.2" opacity="0.75" />
+    {/* Folder front body */}
+    <rect x="4" y="17" width="56" height="30" rx="6" fill="rgba(54,171,202,0.12)" stroke="var(--dock-gly)" strokeWidth="1.2" />
+    {/* specular reflection glaze */}
+    <path d="M4 23a6 6 0 0 1 6-6h44a6 6 0 0 1 6 6v2H4z" fill="#fff" opacity="0.06" />
+    {/* tech detail lines */}
+    <line x1="16" y1="28" x2="48" y2="28" stroke="var(--dock-gly)" strokeWidth="1" opacity="0.35" />
+    <line x1="16" y1="34" x2="38" y2="34" stroke="var(--dock-gly)" strokeWidth="1" opacity="0.35" />
+    {/* activity node */}
+    <circle cx="48" cy="34" r="2.4" fill="var(--amber-bright)" />
   </svg>
 );
 
@@ -158,7 +371,7 @@ const ItemIcon = ({ node, s }) =>
   node?.type === "dir" ? <FolderIcon s={s} /> : <DocIcon ext={node?.ext} s={s} />;
 
 // Dock app icons — fluid-glass tiles with cyan line glyphs
-const GLY = "#8fdcef";
+const GLY = "var(--dock-gly)";
 const Tile = () => (
   <>
     <rect x="3" y="3" width="58" height="58" rx="15" fill="rgba(54,171,202,0.10)" stroke="rgba(150,205,245,0.32)" strokeWidth="1" />
@@ -276,16 +489,25 @@ const css = `
   --sheet:#e7f0f4;
   --shadow:inset 0 1px 0 0 rgba(255,255,255,.22),inset 0 -1px 0 0 rgba(255,255,255,.06),0 18px 50px rgba(0,0,0,.5);
   --menu:rgba(11,21,29,.5); --selrow:rgba(95,165,188,.06);
+  --dock-gly:#8fdcef;
+  --mb-brand-color:var(--accent-bright);
 }
 .os[data-theme="light"]{
   --accent:#1f7e99; --accent-bright:#36abca; --amber:#b9802f; --amber-bright:#d99c44;
-  --txt:rgba(8,28,36,.9); --txt2:rgba(8,28,36,.55); --txt3:rgba(8,28,36,.36);
-  --sep:rgba(40,90,110,.16); --sep2:rgba(40,110,140,.30);
-  --mat:rgba(226,240,245,.6); --mat-bar:rgba(236,245,248,.55); --mat-side:rgba(214,232,238,.5);
-  --ctl:rgba(40,90,110,.06); --ctl-h:rgba(40,90,110,.12);
+  --txt:rgba(8,28,36,.9); --txt2:rgba(8,28,36,.68); --txt3:rgba(8,28,36,.45);
+  --sep:rgba(40,90,110,.24); --sep2:rgba(40,110,140,.36);
+  --mat:rgba(226,240,245,.7); --mat-bar:rgba(220,238,245,.82); --mat-side:rgba(214,232,238,.6);
+  --ctl:rgba(40,90,110,.10); --ctl-h:rgba(40,90,110,.18);
   --sheet:#fff;
   --shadow:inset 0 1px 0 0 rgba(255,255,255,.7),inset 0 -1px 0 0 rgba(255,255,255,.3),0 18px 50px rgba(20,40,60,.22);
-  --menu:rgba(238,246,249,.7); --selrow:rgba(40,90,110,.05);
+  --menu:rgba(230,242,246,.85); --selrow:rgba(40,90,110,.08);
+  --dock-gly:var(--accent);
+  --mb-brand-color:var(--accent);
+  --desk-lbl-txt:var(--txt);
+  --desk-lbl-bg:rgba(226,240,245,.75);
+  --desk-lbl-border:.5px solid rgba(40,90,110,.2);
+  --desk-lbl-bf:blur(8px);
+  --desk-lbl-sel-txt:#fff;
 }
 
 /* ── Wallpaper — sleeping-system void: drifting petrol/teal pools, no grids ── */
@@ -314,7 +536,7 @@ const css = `
   background:var(--mat-bar);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);
   border-bottom:.5px solid var(--sep);font-size:13px;}
 .mb-brand{font-weight:700;font-size:14px;letter-spacing:.16em;padding:3px 11px 3px 12px;border-radius:5px;cursor:default;
-  color:var(--accent-bright);text-shadow:0 0 12px color-mix(in srgb,var(--accent-bright) 60%,transparent);}
+  color:var(--mb-brand-color);text-shadow:0 0 12px color-mix(in srgb,var(--mb-brand-color) 60%,transparent);}
 .mb-brand:hover,.mb-brand.open{background:var(--ctl-h);}
 .mb-item{padding:3px 9px;border-radius:5px;cursor:default;white-space:nowrap;line-height:1;font-weight:500;letter-spacing:.04em;}
 .mb-item.bold{font-weight:700;}
@@ -348,21 +570,18 @@ const css = `
 @keyframes winOpen{from{opacity:0;transform:scale(.95);}to{opacity:1;transform:scale(1);}}
 .win:not(.active){box-shadow:0 18px 48px rgba(0,0,0,.35);}
 .win.min{transform:scale(.18) translateY(60vh);opacity:0;pointer-events:none;}
-.win-bar{height:48px;display:flex;align-items:center;gap:12px;padding:0 14px;flex-shrink:0;
+.win-bar{height:48px;display:flex;align-items:center;gap:12px;padding:0 0 0 14px;flex-shrink:0;
   border-bottom:.5px solid var(--sep);cursor:default;user-select:none;}
-.win-bar.compact{height:38px;justify-content:flex-start;}
-.win-title{flex:1;text-align:center;font-size:13px;font-weight:600;color:var(--txt2);margin-right:54px;}
+.win-bar.compact{height:38px;}
+.win-title{flex:1;text-align:left;font-size:13px;font-weight:600;color:var(--txt2);}
 
-/* traffic lights */
-.lights{display:flex;gap:8px;align-items:center;}
-.light{width:12px;height:12px;border-radius:50%;border:none;padding:0;cursor:pointer;position:relative;
-  display:flex;align-items:center;justify-content:center;}
-.light span{font-size:9px;line-height:1;color:rgba(0,0,0,.55);opacity:0;font-weight:700;transform:translateY(-.5px);}
-.lights:hover .light span{opacity:1;}
-.win:not(.active) .light{background:var(--ctl-h)!important;}
-.light.close{background:#ff5f57;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15);}
-.light.min{background:#febc2e;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15);}
-.light.zoom{background:#28c840;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15);}
+/* Windows Window Controls */
+.win-ctrls{display:flex;align-self:stretch;height:100%;margin-left:auto;}
+.win-btn{width:46px;height:100%;display:flex;align-items:center;justify-content:center;
+  background:transparent;border:none;color:var(--txt2);cursor:pointer;transition:background .1s,color .1s;}
+.win-btn:hover{background:var(--ctl-h);color:var(--txt);}
+.win-btn.close:hover{background:#e81123!important;color:#fff!important;}
+.win-btn svg{width:10px;height:10px;display:block;}
 
 .win-body{flex:1;display:flex;overflow:hidden;}
 
@@ -482,9 +701,8 @@ const css = `
 /* ── Quick Look ── */
 .ql-bg{position:fixed;inset:0;z-index:9600;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.4);backdrop-filter:blur(6px);animation:menuIn .15s ease;}
 .ql{width:min(560px,72vw);max-height:78vh;border-radius:14px;overflow:hidden;background:var(--mat);backdrop-filter:blur(50px) saturate(180%);-webkit-backdrop-filter:blur(50px) saturate(180%);border:.5px solid var(--sep2);box-shadow:var(--shadow);display:flex;flex-direction:column;animation:winOpen .2s cubic-bezier(.3,1.2,.5,1);}
-.ql-bar{height:42px;display:flex;align-items:center;padding:0 14px;border-bottom:.5px solid var(--sep);}
-.ql-bar .lights{margin-right:12px;}
-.ql-bar .t{flex:1;text-align:center;font-size:13px;font-weight:600;color:var(--txt2);margin-right:50px;}
+.ql-bar{height:42px;display:flex;align-items:center;padding:0 0 0 14px;border-bottom:.5px solid var(--sep);}
+.ql-bar .t{flex:1;text-align:left;font-size:13px;font-weight:600;color:var(--txt2);}
 .ql-body{padding:26px;overflow:auto;color:var(--txt);}
 .ql-pre{font-family:var(--mono);font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;}
 .ql-blank{display:flex;flex-direction:column;align-items:center;gap:14px;padding:30px;color:var(--txt2);}
@@ -515,8 +733,8 @@ const css = `
 .desk-ic:hover{background:rgba(150,205,245,.10);}
 .desk-ic.sel{background:color-mix(in srgb,var(--accent) 22%,transparent);}
 .desk-ic svg{filter:drop-shadow(0 5px 10px rgba(0,0,0,.45));}
-.desk-ic .lbl{font-size:12px;color:#eaf6fa;text-align:center;line-height:1.3;max-width:84px;word-break:break-word;background:rgba(4,10,16,.42);padding:1px 7px;border-radius:6px;}
-.desk-ic.sel .lbl{background:var(--accent);color:#04141a;}
+.desk-ic .lbl{font-size:12px;color:var(--desk-lbl-txt, #eaf6fa);text-align:center;line-height:1.3;max-width:84px;word-break:break-word;background:var(--desk-lbl-bg, rgba(4,10,16,.42));padding:1px 7px;border-radius:6px;border:var(--desk-lbl-border, none);backdrop-filter:var(--desk-lbl-bf, none);}
+.desk-ic.sel .lbl{background:var(--accent);color:var(--desk-lbl-sel-txt, #04141a);}
 
 /* ── Spotlight ── */
 .spot-bg{position:absolute;inset:0;z-index:9900;display:flex;flex-direction:column;align-items:center;padding-top:18vh;background:rgba(0,0,0,.06);}
@@ -577,6 +795,7 @@ function useNow() {
    Menubar
    ════════════════════════════════════════════════════════════════════════ */
 function MenuBar({ user, theme, onToggleTheme, onLogout, onNewFinder, onAbout, onSpotlight }) {
+  const { lang, setLang, t } = useLanguage();
   const now = useNow();
   const [open, setOpen] = useState(null);
   const ref = useRef();
@@ -598,36 +817,42 @@ function MenuBar({ user, theme, onToggleTheme, onLogout, onNewFinder, onAbout, o
   const menus = {
     apple: (
       <div className="menu" style={{ left: 10 }}>
-        <Row label="About This Reserve" on={onAbout} />
+        <Row label={t("about_reserve")} on={onAbout} />
         <Sep />
-        <Row label="System Settings…" disabled />
+        <Row label={t("system_settings")} disabled />
         <Sep />
-        <Row label={`Lock Screen`} k="⌃⌘Q" on={onLogout} />
-        <Row label={`Log Out ${user}…`} k="⇧⌘Q" on={onLogout} />
+        <Row label={t("lock_screen")} k="⌃⌘Q" on={onLogout} />
+        <Row label={`${t("log_out")} ${user}…`} k="⇧⌘Q" on={onLogout} />
       </div>
     ),
     finder: (
       <div className="menu" style={{ left: 56 }}>
-        <Row label="About Finder" on={onAbout} />
+        <Row label={t("about_finder")} on={onAbout} />
         <Sep />
-        <Row label="Preferences…" disabled />
+        <Row label={t("preferences")} disabled />
         <Sep />
-        <Row label="Empty Trash…" disabled />
+        <Row label={t("empty_trash")} disabled />
       </div>
     ),
     file: (
       <div className="menu" style={{ left: 96 }}>
-        <Row label="New Finder Window" k="⌘N" on={onNewFinder} />
-        <Row label="New Folder" k="⇧⌘N" disabled />
+        <Row label={t("new_finder_window")} k="⌘N" on={onNewFinder} />
+        <Row label={t("new_folder")} k="⇧⌘N" disabled />
         <Sep />
-        <Row label="Find…" k="⌘F" on={onSpotlight} />
+        <Row label={t("find")} k="⌘F" on={onSpotlight} />
       </div>
     ),
     view: (
       <div className="menu" style={{ left: 180 }}>
-        <Row label={theme === "dark" ? "Switch to Light Appearance" : "Switch to Dark Appearance"} on={onToggleTheme} />
+        <Row label={theme === "dark" ? t("light_appearance") : t("dark_appearance")} on={onToggleTheme} />
         <Sep />
-        <Row label="Show Spotlight" k="⌘Space" on={onSpotlight} />
+        <Row label={t("show_spotlight")} k="⌘Space" on={onSpotlight} />
+      </div>
+    ),
+    lang: (
+      <div className="menu" style={{ right: 80, minWidth: 140 }}>
+        <Row label="Türkçe (TR)" on={() => setLang("tr")} />
+        <Row label="English (EN)" on={() => setLang("en")} />
       </div>
     ),
   };
@@ -645,19 +870,27 @@ function MenuBar({ user, theme, onToggleTheme, onLogout, onNewFinder, onAbout, o
       <span className={`mb-brand${open === "apple" ? " open" : ""}`}
         onMouseDown={(e) => { e.stopPropagation(); setOpen(open === "apple" ? null : "apple"); }}
         onMouseEnter={() => open && setOpen("apple")}>H.İ.S.A.R.</span>
-      {item("file", "File")}
-      {item("edit", "Edit")}
-      {item("view", "View")}
-      {item("go", "Go")}
+      {item("file", t("file"))}
+      {item("edit", t("edit"))}
+      {item("view", t("view"))}
+      {item("go", t("go"))}
       {open && menus[open]}
 
       <div className="mb-right">
         <span className="mb-tray arc" title="System nominal"><ArcReactor /></span>
-        <span className="mb-tray" title="Search" onMouseDown={(e) => { e.stopPropagation(); onSpotlight(); }}><TopGlyph name="search" /></span>
+        <span className="mb-tray" title={t("find")} onMouseDown={(e) => { e.stopPropagation(); onSpotlight(); }}><TopGlyph name="search" /></span>
+        <span
+          className={`mb-item lang-toggle${open === "lang" ? " open" : ""}`}
+          onMouseDown={(e) => { e.stopPropagation(); setOpen(open === "lang" ? null : "lang"); }}
+          onMouseEnter={() => open && setOpen("lang")}
+          style={{ fontWeight: 600, fontSize: 12, fontFamily: "var(--mono)", cursor: "default", padding: "3px 8px", borderRadius: "5px", textShadow: "none" }}
+        >
+          {lang.toUpperCase()}
+        </span>
         <span className="mb-clock">
-          {now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }).toUpperCase()}
+          {now.toLocaleDateString(lang === "tr" ? "tr-TR" : "en-US", { weekday: "short", month: "short", day: "numeric" }).toUpperCase()}
           {"  "}
-          {now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+          {now.toLocaleTimeString(lang === "tr" ? "tr-TR" : "en-GB", { hour: "2-digit", minute: "2-digit" })}
         </span>
       </div>
     </div>
@@ -703,12 +936,25 @@ function WindowShell({ win, active, compact, title, toolbar, onFocus, onClose, o
       onMouseDown={onFocus}
     >
       <div className={`win-bar${compact ? " compact" : ""}`} onMouseDown={startDrag} onDoubleClick={onZoom}>
-        <div className="lights" onMouseDown={(e) => e.stopPropagation()}>
-          <button className="light close" title="Close" onClick={onClose}><span>×</span></button>
-          <button className="light min" title="Minimize" onClick={onMinimize}><span>−</span></button>
-          <button className="light zoom" title="Zoom" onClick={onZoom}><span>+</span></button>
-        </div>
         {compact ? <div className="win-title">{title}</div> : toolbar}
+        <div className="win-ctrls no-drag" onMouseDown={(e) => e.stopPropagation()}>
+          <button className="win-btn" title="Minimize" onClick={onMinimize}>
+            <svg viewBox="0 0 10 10"><line x1="1" y1="9" x2="9" y2="9" stroke="currentColor" strokeWidth="1.2" fill="none" /></svg>
+          </button>
+          <button className="win-btn" title={win.maximized ? "Restore" : "Maximize"} onClick={onZoom}>
+            {win.maximized ? (
+              <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1">
+                <rect x="1.5" y="3.5" width="5" height="5" />
+                <path d="M3.5 3.5V1.5h5v5H6.5" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2"><rect x="1.5" y="1.5" width="7" height="7" /></svg>
+            )}
+          </button>
+          <button className="win-btn close" title="Close" onClick={onClose}>
+            <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" /></svg>
+          </button>
+        </div>
       </div>
       <div className="win-body">{children}</div>
       {["n", "s", "e", "w", "ne", "nw", "se", "sw"].map((d) => (
@@ -730,6 +976,7 @@ const SIDEBAR = [
 ];
 
 function FinderWindow({ win, active, fs, setFs, onFocus, onClose, onMinimize, onZoom, onChange, onOpenText, onNewFinder }) {
+  const { t, lang } = useLanguage();
   const [cwd, setCwd] = useState(win.initPath || "/");
   const [history, setHistory] = useState([win.initPath || "/"]);
   const [hi, setHi] = useState(0);
@@ -896,14 +1143,17 @@ function FinderWindow({ win, active, fs, setFs, onFocus, onClose, onMinimize, on
 
   const selName = sel.size === 1 ? [...sel][0] : null;
   const selNode = selName ? fs[joinPath(cwd, selName)] : null;
-  const crumbs = cwd === "/" ? [{ label: "Home", path: "/" }] : [{ label: "Home", path: "/" }, ...cwd.slice(1).split("/").map((p, i, arr) => ({ label: p, path: "/" + arr.slice(0, i + 1).join("/") }))];
+  const crumbs = cwd === "/" ? [{ label: t("home"), path: "/" }] : [{ label: t("home"), path: "/" }, ...cwd.slice(1).split("/").map((p, i, arr) => {
+    const translated = t(p.toLowerCase());
+    return { label: translated !== p.toLowerCase() ? translated : p, path: "/" + arr.slice(0, i + 1).join("/") };
+  })];
 
   // ── toolbar ──
   const toolbar = (
     <div className="tb">
       <button className="tb-btn" onClick={goBack} disabled={hi === 0}><TbGlyph name="back" /></button>
       <button className="tb-btn" onClick={goFwd} disabled={hi === history.length - 1}><TbGlyph name="fwd" /></button>
-      <button className="tb-btn" title="Sidebar" onClick={() => setShowSidebar((v) => !v)}><TbGlyph name="sidebar" /></button>
+      <button className="tb-btn" title={t("sidebar")} onClick={() => setShowSidebar((v) => !v)}><TbGlyph name="sidebar" /></button>
       <div className="crumbs">
         {crumbs.map((c, i) => (
           <span key={c.path} style={{ display: "flex", alignItems: "center", gap: 2, minWidth: 0 }}>
@@ -916,12 +1166,12 @@ function FinderWindow({ win, active, fs, setFs, onFocus, onClose, onMinimize, on
         <button className={`seg${view === "grid" ? " on" : ""}`} onClick={() => setView("grid")}><TbGlyph name="grid" /></button>
         <button className={`seg${view === "list" ? " on" : ""}`} onClick={() => setView("list")}><TbGlyph name="list" /></button>
       </div>
-      <button className="tb-btn" title="Get Info" onClick={() => setShowInfo((v) => !v)}><TbGlyph name="info" /></button>
-      <button className="tb-btn" title="Upload" onClick={() => fileInput.current?.click()}><TbGlyph name="upload" /></button>
-      <button className="tb-btn" title="New Folder" onClick={() => setDlg({ type: "mkdir", value: "untitled folder" })}><TbGlyph name="newfolder" /></button>
+      <button className="tb-btn" title={t("get_info")} onClick={() => setShowInfo((v) => !v)}><TbGlyph name="info" /></button>
+      <button className="tb-btn" title={t("upload")} onClick={() => fileInput.current?.click()}><TbGlyph name="upload" /></button>
+      <button className="tb-btn" title={t("new_folder")} onClick={() => setDlg({ type: "mkdir", value: t("untitled_folder") })}><TbGlyph name="newfolder" /></button>
       <div className={`search-wrap${searchOpen || query ? " open" : ""}`}>
         <TbGlyph name="search" />
-        <input placeholder="Search" value={query} onFocus={() => setSearchOpen(true)} onBlur={() => setSearchOpen(false)} onChange={(e) => setQuery(e.target.value)} />
+        <input placeholder={t("search")} value={query} onFocus={() => setSearchOpen(true)} onBlur={() => setSearchOpen(false)} onChange={(e) => setQuery(e.target.value)} />
       </div>
       <input ref={fileInput} type="file" multiple style={{ display: "none" }} onChange={(e) => doUpload(e.target.files)} />
     </div>
@@ -938,15 +1188,15 @@ function FinderWindow({ win, active, fs, setFs, onFocus, onClose, onMinimize, on
           <div className="win-body" style={{ flex: 1 }}>
             {showSidebar && (
               <div className="sidebar no-drag">
-                <div className="side-head">Favorites</div>
+                <div className="side-head">{t("favorites")}</div>
                 {SIDEBAR.map((s) => (
                   <div key={s.path} className={`side-item${cwd === s.path ? " on" : ""}`} onClick={() => navigate(s.path)}>
-                    <span className="gl"><SideGlyph name={s.glyph} /></span>{s.label}
+                    <span className="gl"><SideGlyph name={s.glyph} /></span>{t(s.label.toLowerCase())}
                   </div>
                 ))}
-                <div className="side-head" style={{ marginTop: 8 }}>Tags</div>
+                <div className="side-head" style={{ marginTop: 8 }}>{t("tags")}</div>
                 {[["#ff5f57", "Red"], ["#febc2e", "Orange"], ["#28c840", "Green"], ["#0a84ff", "Blue"]].map(([c, n]) => (
-                  <div key={n} className="side-item"><span className="side-tag" style={{ background: c }} />{n}</div>
+                  <div key={n} className="side-item"><span className="side-tag" style={{ background: c }} />{t(n.toLowerCase())}</div>
                 ))}
               </div>
             )}
@@ -954,7 +1204,7 @@ function FinderWindow({ win, active, fs, setFs, onFocus, onClose, onMinimize, on
             <div className="area" ref={areaRef} onMouseDown={onAreaDown}
               onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, target: null }); }}>
               {items.length === 0 ? (
-                <div className="empty">{query ? "No matching items." : "This folder is empty. Drop files here to upload."}</div>
+                <div className="empty">{query ? t("no_matching_items") : t("empty_folder")}</div>
               ) : view === "grid" ? (
                 <div className="grid">
                   {items.map(({ name, node }, idx) => (
@@ -969,7 +1219,7 @@ function FinderWindow({ win, active, fs, setFs, onFocus, onClose, onMinimize, on
                 </div>
               ) : (
                 <div className="list">
-                  <div className="lhead"><span style={{ flex: 1 }}>Name</span><span style={{ width: 74, textAlign: "right" }}>Size</span><span style={{ width: 90, textAlign: "right" }}>Modified</span></div>
+                  <div className="lhead"><span style={{ flex: 1 }}>{t("name")}</span><span style={{ width: 74, textAlign: "right" }}>{t("size")}</span><span style={{ width: 90, textAlign: "right" }}>{t("modified")}</span></div>
                   {items.map(({ name, node }, idx) => (
                     <div key={name} data-name={name} className={`lrow${sel.has(name) ? " sel" : ""}`}
                       onClick={(e) => clickItem(e, name, idx)}
@@ -989,25 +1239,29 @@ function FinderWindow({ win, active, fs, setFs, onFocus, onClose, onMinimize, on
                 <div className="info-ic"><ItemIcon node={selNode} s={64} /></div>
                 <div className="info-name">{selName}</div>
                 <div className="info-sep" />
-                <div className="info-row"><span className="info-k">Kind</span><span className="info-v">{selNode.type === "dir" ? "Folder" : `${(selNode.ext || "file").toUpperCase()} document`}</span></div>
+                <div className="info-row"><span className="info-k">{t("kind")}</span><span className="info-v">{selNode.type === "dir" ? t("folder") : `${(selNode.ext || "file").toUpperCase()} ${t("document")}`}</span></div>
                 {selNode.type === "dir" ? (
-                  <div className="info-row"><span className="info-k">Items</span><span className="info-v">{selNode.children.length}</span></div>
+                  <div className="info-row"><span className="info-k">{t("items")}</span><span className="info-v">{selNode.children.length}</span></div>
                 ) : (
-                  <div className="info-row"><span className="info-k">Size</span><span className="info-v">{selNode.size}</span></div>
+                  <div className="info-row"><span className="info-k">{t("size")}</span><span className="info-v">{selNode.size}</span></div>
                 )}
-                {selNode.modified && <div className="info-row"><span className="info-k">Modified</span><span className="info-v" style={{ color: "var(--amber-bright)", fontFamily: "var(--mono)" }}>{selNode.modified}</span></div>}
-                <div className="info-row"><span className="info-k">Where</span><span className="info-v">{cwd}</span></div>
+                {selNode.modified && <div className="info-row"><span className="info-k">{t("modified")}</span><span className="info-v" style={{ color: "var(--amber-bright)", fontFamily: "var(--mono)" }}>{selNode.modified}</span></div>}
+                <div className="info-row"><span className="info-k">{t("where")}</span><span className="info-v">{cwd}</span></div>
                 {selNode.content && (<><div className="info-sep" /><div className="info-pre">{selNode.content}</div></>)}
               </div>
             )}
           </div>
 
           <div className="statusbar">
-            <span>{items.length} item{items.length !== 1 ? "s" : ""}{sel.size ? `, ${sel.size} selected` : ""}</span>
+            <span>
+              {lang === "tr"
+                ? `${items.length} ${t("items")}${sel.size ? `, ${sel.size} ${t("selected")}` : ""}`
+                : `${items.length} ${items.length === 1 ? t("item") : t("items")}${sel.size ? `, ${sel.size} ${t("selected")}` : ""}`}
+            </span>
             <span style={{ fontFamily: "var(--mono)" }}>sandbox:{cwd}</span>
           </div>
 
-          {dragOver && <div className="drop">Drop to upload</div>}
+          {dragOver && <div className="drop">{t("drop_to_upload")}</div>}
         </div>
       </WindowShell>
 
@@ -1021,21 +1275,21 @@ function FinderWindow({ win, active, fs, setFs, onFocus, onClose, onMinimize, on
           <div className="ctx" style={{ left: Math.min(ctx.x, window.innerWidth - 200), top: Math.min(ctx.y, window.innerHeight - 220) }}>
             {ctx.target ? (
               <>
-                <div className="ctx-row" onClick={() => { openItem(ctx.target); setCtx(null); }}>Open</div>
-                <div className="ctx-row" onClick={() => { setQl(ctx.target); setCtx(null); }}>Quick Look<span className="menu-key">Space</span></div>
+                <div className="ctx-row" onClick={() => { openItem(ctx.target); setCtx(null); }}>{t("open")}</div>
+                <div className="ctx-row" onClick={() => { setQl(ctx.target); setCtx(null); }}>{t("quick_look")}<span className="menu-key">Space</span></div>
                 <div className="ctx-sep" />
-                <div className="ctx-row" onClick={() => { setDlg({ type: "rename", target: ctx.target, value: ctx.target }); setCtx(null); }}>Rename…</div>
-                <div className="ctx-row" onClick={() => { fileInput.current?.click(); setCtx(null); }}>Upload Here…</div>
+                <div className="ctx-row" onClick={() => { setDlg({ type: "rename", target: ctx.target, value: ctx.target }); setCtx(null); }}>{t("rename")}</div>
+                <div className="ctx-row" onClick={() => { fileInput.current?.click(); setCtx(null); }}>{t("upload_here")}</div>
                 <div className="ctx-sep" />
-                <div className="ctx-row danger" onClick={() => { doDelete(sel.size ? [...sel] : [ctx.target]); setCtx(null); }}>Move to Trash<span className="menu-key">⌘⌫</span></div>
+                <div className="ctx-row danger" onClick={() => { doDelete(sel.size ? [...sel] : [ctx.target]); setCtx(null); }}>{t("move_to_trash")}<span className="menu-key">⌘⌫</span></div>
               </>
             ) : (
               <>
-                <div className="ctx-row" onClick={() => { setDlg({ type: "mkdir", value: "untitled folder" }); setCtx(null); }}>New Folder<span className="menu-key">⇧⌘N</span></div>
-                <div className="ctx-row" onClick={() => { fileInput.current?.click(); setCtx(null); }}>Upload Files…</div>
+                <div className="ctx-row" onClick={() => { setDlg({ type: "mkdir", value: t("untitled_folder") }); setCtx(null); }}>{t("new_folder")}<span className="menu-key">⇧⌘N</span></div>
+                <div className="ctx-row" onClick={() => { fileInput.current?.click(); setCtx(null); }}>{t("upload_files")}</div>
                 <div className="ctx-sep" />
-                <div className="ctx-row" onClick={() => { setView(view === "grid" ? "list" : "grid"); setCtx(null); }}>{view === "grid" ? "View as List" : "View as Icons"}</div>
-                <div className="ctx-row" onClick={() => { onNewFinder(cwd); setCtx(null); }}>Open in New Window</div>
+                <div className="ctx-row" onClick={() => { setView(view === "grid" ? "list" : "grid"); setCtx(null); }}>{view === "grid" ? t("view_as_list") : t("view_as_icons")}</div>
+                <div className="ctx-row" onClick={() => { onNewFinder(cwd); setCtx(null); }}>{t("open_new_window")}</div>
               </>
             )}
           </div>
@@ -1045,10 +1299,10 @@ function FinderWindow({ win, active, fs, setFs, onFocus, onClose, onMinimize, on
       {/* dialog */}
       {dlg && (
         <DialogPrompt
-          title={dlg.type === "mkdir" ? "New Folder" : "Rename"}
-          desc={dlg.type === "mkdir" ? "Name of new folder inside " + cwd : "Enter a new name for “" + dlg.target + "”"}
+          title={dlg.type === "mkdir" ? t("dialog_new_folder_title") : t("dialog_rename_title")}
+          desc={dlg.type === "mkdir" ? t("dialog_new_folder_desc") + cwd : t("dialog_rename_desc").replace("{name}", dlg.target)}
           initial={dlg.value}
-          okLabel={dlg.type === "mkdir" ? "Create" : "Rename"}
+          okLabel={dlg.type === "mkdir" ? t("create") : t("rename")}
           onCancel={() => setDlg(null)}
           onOk={(v) => { dlg.type === "mkdir" ? doMkdir(v) : doRename(dlg.target, v); setDlg(null); }}
         />
@@ -1066,6 +1320,7 @@ function FinderWindow({ win, active, fs, setFs, onFocus, onClose, onMinimize, on
    Dialog prompt
    ════════════════════════════════════════════════════════════════════════ */
 function DialogPrompt({ title, desc, initial, okLabel, onOk, onCancel }) {
+  const { t } = useLanguage();
   const [v, setV] = useState(initial || "");
   const ref = useRef();
   useEffect(() => { ref.current?.focus(); ref.current?.select(); }, []);
@@ -1077,7 +1332,7 @@ function DialogPrompt({ title, desc, initial, okLabel, onOk, onCancel }) {
         <input ref={ref} value={v} onChange={(e) => setV(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") onOk(v); if (e.key === "Escape") onCancel(); }} />
         <div className="dialog-actions">
-          <button className="btn sec" onClick={onCancel}>Cancel</button>
+          <button className="btn sec" onClick={onCancel}>{t("cancel")}</button>
           <button className="btn pri" onClick={() => onOk(v)}>{okLabel}</button>
         </div>
       </div>
@@ -1089,6 +1344,7 @@ function DialogPrompt({ title, desc, initial, okLabel, onOk, onCancel }) {
    Quick Look
    ════════════════════════════════════════════════════════════════════════ */
 function QuickLook({ name, node, onClose }) {
+  const { t } = useLanguage();
   useEffect(() => {
     const k = (e) => { if (e.key === "Escape" || e.key === " ") { e.preventDefault(); onClose(); } };
     window.addEventListener("keydown", k);
@@ -1098,8 +1354,12 @@ function QuickLook({ name, node, onClose }) {
     <div className="ql-bg" onMouseDown={onClose}>
       <div className="ql" onMouseDown={(e) => e.stopPropagation()}>
         <div className="ql-bar">
-          <div className="lights"><button className="light close" onClick={onClose}><span>×</span></button><button className="light min" /><button className="light zoom" /></div>
           <div className="t">{name}</div>
+          <div className="win-ctrls no-drag">
+            <button className="win-btn close" title="Close" onClick={onClose}>
+              <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" /></svg>
+            </button>
+          </div>
         </div>
         <div className="ql-body">
           {node.content ? (
@@ -1108,7 +1368,7 @@ function QuickLook({ name, node, onClose }) {
             <div className="ql-blank">
               <ItemIcon node={node} s={120} />
               <div style={{ fontWeight: 600, fontSize: 15 }}>{name}</div>
-              <div style={{ fontSize: 12, opacity: .7 }}>{node.size} · No preview available</div>
+              <div style={{ fontSize: 12, opacity: .7 }}>{node.size} · {t("no_preview")}</div>
             </div>
           )}
         </div>
@@ -1121,12 +1381,13 @@ function QuickLook({ name, node, onClose }) {
    TextEdit window
    ════════════════════════════════════════════════════════════════════════ */
 function TextEditWindow({ win, active, fs, onFocus, onClose, onMinimize, onZoom, onChange }) {
+  const { t } = useLanguage();
   const node = fs[win.path];
   const name = baseName(win.path || "");
   return (
     <WindowShell win={win} active={active} compact title={name} onFocus={onFocus} onClose={onClose} onMinimize={onMinimize} onZoom={onZoom} onChange={onChange}>
       <div style={{ flex: 1, overflow: "auto", padding: "26px 30px", fontFamily: "var(--mono)", fontSize: 13, lineHeight: 1.65, whiteSpace: "pre-wrap", wordBreak: "break-word", color: "var(--txt)" }}>
-        {node?.content ?? "(empty file)"}
+        {node?.content ?? t("empty_file")}
       </div>
     </WindowShell>
   );
@@ -1136,6 +1397,7 @@ function TextEditWindow({ win, active, fs, onFocus, onClose, onMinimize, onZoom,
    Spotlight
    ════════════════════════════════════════════════════════════════════════ */
 function Spotlight({ fs, onClose, onOpen }) {
+  const { t } = useLanguage();
   const [q, setQ] = useState("");
   const [idx, setIdx] = useState(0);
   const ref = useRef();
@@ -1143,9 +1405,9 @@ function Spotlight({ fs, onClose, onOpen }) {
 
   const results = useMemo(() => {
     if (!q.trim()) return [];
-    const t = q.toLowerCase();
+    const targetTerm = q.toLowerCase();
     return Object.keys(fs)
-      .filter((p) => p !== "/" && baseName(p).toLowerCase().includes(t))
+      .filter((p) => p !== "/" && baseName(p).toLowerCase().includes(targetTerm))
       .slice(0, 8)
       .map((p) => ({ path: p, node: fs[p] }));
   }, [q, fs]);
@@ -1159,7 +1421,7 @@ function Spotlight({ fs, onClose, onOpen }) {
       <div className="spot" onMouseDown={(e) => e.stopPropagation()}>
         <div className="spot-input">
           <span className="gl"><TopGlyph name="search" /></span>
-          <input ref={ref} value={q} placeholder="Spotlight Search" onChange={(e) => setQ(e.target.value)}
+          <input ref={ref} value={q} placeholder={t("spotlight_search")} onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Escape") onClose();
               else if (e.key === "ArrowDown") { e.preventDefault(); setIdx((i) => Math.min(results.length - 1, i + 1)); }
@@ -1170,7 +1432,7 @@ function Spotlight({ fs, onClose, onOpen }) {
         {q.trim() && (
           <div className="spot-res">
             {results.length === 0 ? (
-              <div className="spot-empty">No results for “{q}”</div>
+              <div className="spot-empty">{t("no_results").replace("{query}", q)}</div>
             ) : results.map((r, i) => (
               <div key={r.path} className={`spot-row${i === idx ? " on" : ""}`} onMouseEnter={() => setIdx(i)} onClick={() => choose(r)}>
                 <ItemIcon node={r.node} s={26} />
@@ -1178,7 +1440,7 @@ function Spotlight({ fs, onClose, onOpen }) {
                   <div style={{ fontSize: 13, fontWeight: 500 }}>{baseName(r.path)}</div>
                   <div style={{ fontSize: 11, opacity: .6, fontFamily: "var(--mono)" }}>{r.path}</div>
                 </div>
-                <span className="sp-meta">{r.node.type === "dir" ? "Folder" : r.node.size}</span>
+                <span className="sp-meta">{r.node.type === "dir" ? t("folder") : r.node.size}</span>
               </div>
             ))}
           </div>
@@ -1192,15 +1454,16 @@ function Spotlight({ fs, onClose, onOpen }) {
    Dock
    ════════════════════════════════════════════════════════════════════════ */
 function Dock({ running, bouncing, minimized, onOpenFinder, onToggleTheme, onRestore }) {
+  const { t } = useLanguage();
   const [mx, setMx] = useState(null);
   const ref = useRef();
   const BASE = 54, MAX = 30, RANGE = 90;
 
   const apps = [
-    { id: "finder", label: "Finder", icon: <IcFinder />, on: onOpenFinder },
-    { id: "terminal", label: "Terminal", icon: <IcTerminal />, on: () => {} },
-    { id: "textedit", label: "TextEdit", icon: <IcTextEdit />, on: () => {} },
-    { id: "settings", label: "Appearance", icon: <IcSettings />, on: onToggleTheme },
+    { id: "finder", label: t("dock_finder"), icon: <IcFinder />, on: onOpenFinder },
+    { id: "terminal", label: t("dock_terminal"), icon: <IcTerminal />, on: () => {} },
+    { id: "textedit", label: t("dock_textedit"), icon: <IcTextEdit />, on: () => {} },
+    { id: "settings", label: t("dock_appearance"), icon: <IcSettings />, on: onToggleTheme },
   ];
 
   // Flat layout: apps · [minimized windows] · trash (separators between groups)
@@ -1215,7 +1478,7 @@ function Dock({ running, bouncing, minimized, onOpenFinder, onToggleTheme, onRes
     }));
   }
   entries.push({ sep: true, id: "sep-trash" });
-  entries.push({ id: "trash", label: "Trash", icon: <IcTrash /> });
+  entries.push({ id: "trash", label: t("dock_trash"), icon: <IcTrash /> });
 
   const scaleFor = (centerX) => {
     if (mx == null || centerX == null) return 0;
@@ -1263,6 +1526,7 @@ function Dock({ running, bouncing, minimized, onOpenFinder, onToggleTheme, onRes
    Login (macOS lock screen)
    ════════════════════════════════════════════════════════════════════════ */
 function Login({ theme, user, onLogin }) {
+  const { t, lang } = useLanguage();
   const now = useNow();
   const [pwd, setPwd] = useState("");
   const [err, setErr] = useState(false);
@@ -1278,22 +1542,22 @@ function Login({ theme, user, onLogin }) {
       <div className="wallpaper" />
       <div className="login">
         <div className="login-clock">
-          <div className="d">{now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</div>
-          <div className="t">{now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })}</div>
+          <div className="d">{now.toLocaleDateString(lang === "tr" ? "tr-TR" : "en-US", { weekday: "long", month: "long", day: "numeric" })}</div>
+          <div className="t">{now.toLocaleTimeString(lang === "tr" ? "tr-TR" : "en-US", { hour: "2-digit", minute: "2-digit", hour12: false })}</div>
         </div>
         <div className={`login-card${err ? " shake" : ""}`}>
           <div className="login-av">{user.charAt(0).toUpperCase()}</div>
           <div className="login-user">{user}</div>
           <div className="login-pwd">
-            <input type="password" placeholder="Enter Password" value={pwd} autoFocus
+            <input type="password" placeholder={t("enter_password")} value={pwd} autoFocus
               onChange={(e) => setPwd(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />
             <button className="login-go" onClick={submit}>→</button>
           </div>
-          <div className={err ? "login-err" : "login-hint"}>{err ? "Password required" : "Touch ID or Enter Password"}</div>
+          <div className={err ? "login-err" : "login-hint"}>{err ? t("password_required") : t("touch_id_or_password")}</div>
         </div>
         <div className="login-brand">
           <div className="n">H.İ.S.A.R.</div>
-          <div className="s">Hızlı İletişim Saklama ve Aktarım Rezervi</div>
+          <div className="s">{t("appName_subtitle")}</div>
         </div>
       </div>
     </div>
@@ -1304,6 +1568,7 @@ function Login({ theme, user, onLogin }) {
    Desktop (window manager)
    ════════════════════════════════════════════════════════════════════════ */
 function Desktop({ theme, setTheme, user, onLogout }) {
+  const { t } = useLanguage();
   const vw = typeof window !== "undefined" ? window.innerWidth : 1280;
   const vh = typeof window !== "undefined" ? window.innerHeight : 800;
 
@@ -1434,8 +1699,8 @@ function Desktop({ theme, setTheme, user, onLogout }) {
   }, [windows]);
 
   const minimized = useMemo(() => windows.filter((w) => w.minimized).map((w) => ({
-    id: w.id, kind: w.kind, title: w.kind === "finder" ? "Finder" : baseName(w.path || "Untitled"),
-  })), [windows]);
+    id: w.id, kind: w.kind, title: w.kind === "finder" ? t("dock_finder") : baseName(w.path || "Untitled"),
+  })), [windows, t]);
 
   // global shortcuts
   useEffect(() => {
@@ -1465,7 +1730,7 @@ function Desktop({ theme, setTheme, user, onLogout }) {
         <div key={d.id} className={`desk-ic${deskSel === d.id ? " sel" : ""}${deskDrag === d.id ? " drag" : ""}`} style={{ left: d.x, top: d.y }}
           onMouseDown={dragDesk(d.id)} onDoubleClick={() => openFinder(d.path)}>
           {d.drive ? <DriveIcon s={56} /> : <FolderIcon s={56} />}
-          <div className="lbl">{d.label}</div>
+          <div className="lbl">{t(d.id)}</div>
         </div>
       ))}
 
@@ -1495,8 +1760,23 @@ function Desktop({ theme, setTheme, user, onLogout }) {
 export default function App() {
   const [theme, setTheme] = useState("dark");
   const [user, setUser] = useState(null);
+  const [lang, setLang] = useState("tr");
   const USERNAME = "ahmet";
 
-  if (!user) return <Login theme={theme} user={USERNAME} onLogin={() => setUser(USERNAME)} />;
-  return <Desktop theme={theme} setTheme={setTheme} user={user} onLogout={() => setUser(null)} />;
+  const t = useCallback((key) => {
+    return TRANSLATIONS[lang]?.[key] || TRANSLATIONS["en"]?.[key] || key;
+  }, [lang]);
+
+  const value = useMemo(() => ({ lang, setLang, t }), [lang, t]);
+
+  if (!user) return (
+    <LanguageContext.Provider value={value}>
+      <Login theme={theme} user={USERNAME} onLogin={() => setUser(USERNAME)} />
+    </LanguageContext.Provider>
+  );
+  return (
+    <LanguageContext.Provider value={value}>
+      <Desktop theme={theme} setTheme={setTheme} user={user} onLogout={() => setUser(null)} />
+    </LanguageContext.Provider>
+  );
 }
