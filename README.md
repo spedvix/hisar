@@ -138,10 +138,8 @@ Every path is validated against a single configurable `SANDBOX_ROOT` to prevent 
 
 ## License
 
-© 2026 spedatox. All rights reserved. This is a private project; no license for reuse or redistribution is granted at this time. Add a `LICENSE` file (e.g. MIT) if you decide to open-source it.
+© 2026 spedatox. All rights reserved.
 
 ---
 
-<div align="center">
-<sub>Built with the SPEDA Mark VI design language.</sub>
-</div>
+<
