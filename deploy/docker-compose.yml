@@ -1,0 +1,38 @@
+# Standalone compose for running H.İ.S.A.R. on its own.
+#
+# On the Contabo host it is instead folded into speda-mark6's compose file —
+# see deploy/README.md for the service block and the Caddy site block to add
+# there, which is the deployment the placement plan describes (Phase H2).
+
+services:
+  hisar:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: hisar-mk1:latest
+    restart: unless-stopped
+    expose:
+      - "8600"
+    # Publish only for standalone/local use; behind Caddy, `expose` is enough.
+    ports:
+      - "127.0.0.1:8600:8600"
+    environment:
+      HISAR_SANDBOX_ROOT: /vault
+      HISAR_OWNER_USERNAME: ${HISAR_OWNER_USERNAME:-ahmet}
+      HISAR_OWNER_PASSWORD_HASH: ${HISAR_OWNER_PASSWORD_HASH:?set in .env}
+      HISAR_JWT_SECRET: ${HISAR_JWT_SECRET:?set in .env}
+      HISAR_MACHINE_TOKEN: ${HISAR_MACHINE_TOKEN:-}
+      HISAR_MAX_UPLOAD_BYTES: ${HISAR_MAX_UPLOAD_BYTES:-2147483648}
+      HISAR_COOKIE_SECURE: ${HISAR_COOKIE_SECURE:-true}
+      HISAR_GOOGLE_CLIENT_ID: ${HISAR_GOOGLE_CLIENT_ID:-}
+      HISAR_GOOGLE_CLIENT_SECRET: ${HISAR_GOOGLE_CLIENT_SECRET:-}
+      HISAR_GOOGLE_REDIRECT_URI: ${HISAR_GOOGLE_REDIRECT_URI:-}
+    volumes:
+      # The vault is the only writable mount. Forge writes into
+      # Forge/workspaces of this same directory, directly on the host.
+      - ${HISAR_VAULT_DIR:-/opt/hisar/vault}:/vault
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp

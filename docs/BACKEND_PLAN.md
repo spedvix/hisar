@@ -277,3 +277,43 @@ the Igor-side `hisar_deposit` skill (H3) can be built against `/api/deposit`.
 - Thumbnails/transcoding — previews stream originals.
 - WebDAV/SFTP alternate protocols — the desktop and `/deposit` are the doors.
 - Postgres/Redis — the filesystem is the database; JSON blobs carry the rest.
+
+---
+
+## 11. Implementation status — H1 shipped
+
+Phase H1 is complete and verified end-to-end, plus one addition beyond this
+plan: **Google Drive is mounted as a virtual folder** (`/Google Drive`) served
+by the same `/files/*` routes, so the desktop treats vault and Drive folders
+identically.
+
+| Piece | Where | State |
+|---|---|---|
+| Path sandbox | `server/paths.py` | Done — 46 unit tests (traversal, symlink escape, prefix confusion, unicode aliasing) |
+| Owner auth — Argon2 hash, JWT httpOnly cookie, login rate limit | `server/auth.py` | Done |
+| Machine token — write-only, scoped to `/SPEDA` + `/Forge` | `server/auth.py` | Done |
+| File routes + `/deposit` + `/files/usage` | `server/files.py`, `server/vault.py` | Done — 29 HTTP tests |
+| Google Drive provider — OAuth, list/upload/download/mkdir/rename/trash | `server/drive.py` | Done; needs live credentials to exercise |
+| Client wired to the API — upload progress, real previews, Drive UI | `api.js`, `hisar.jsx` | Done — verified in a real browser, no console errors |
+| Dockerfile (multi-stage, non-root), compose, deploy guide | `Dockerfile`, `deploy/` | Done — **not yet deployed** |
+| `hisar_deposit` skill (H3) | `integrations/speda_hisar_skill.py` | Reference implementation; installs into speda-mark6 |
+| Forge archive (H4) | — | Not started; the passive layer ships with H2 |
+
+### Deviations from this document
+
+- **`server/sandbox.py` is named `server/paths.py`**, and `server/deposit.py`
+  folded into `server/files.py` — the deposit route is twenty lines and shares
+  every helper with upload.
+- **Delete is a move to `.trash/`**, never a hard delete, on both the vault and
+  Drive (which gets Drive's own trash). H5's "restore from Trash" is now only
+  UI work.
+- **`/files/upload` accepts the machine token too** (scope-limited), not just
+  `/deposit`, so Forge can push archives through one code path.
+- **Drive is owner-only.** Machine credentials are refused on Drive paths
+  outright — an agent must never reach the owner's Google account.
+- **No `/state` blob yet** — desktop layout persistence stays in H5.
+
+### Next
+
+H2 (DNS + Caddy block + compose service) per `deploy/README.md`. Nothing in
+H1 blocks it.

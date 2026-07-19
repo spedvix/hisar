@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext } from "react";
+import * as api from "./api.js";
+import { DRIVE_MOUNT, isDrivePath } from "./api.js";
 
 const LanguageContext = createContext();
 export const useLanguage = () => useContext(LanguageContext);
@@ -82,6 +84,21 @@ const TRANSLATIONS = {
 
     // Quick Look
     no_preview: "No preview available",
+    loading: "Loading…",
+    download: "Download",
+    cloud: "Cloud",
+    google_drive: "Google Drive",
+    connect_drive: "Connect Google Drive…",
+    disconnect_drive: "Disconnect Google Drive",
+    drive_connected: "Google Drive connected",
+    drive_disconnected: "Google Drive disconnected",
+    drive_cancelled: "Google Drive connection cancelled",
+    open_in_drive: "Open in Google Drive",
+    uploaded: "uploaded",
+    files_uploaded: "files uploaded",
+    moved_to_trash: "Moved to Trash",
+    items_trashed: "items moved to Trash",
+    too_many_attempts: "Too many attempts — wait a few minutes",
 
     // TextEdit
     empty_file: "(empty file)",
@@ -182,6 +199,21 @@ const TRANSLATIONS = {
 
     // Quick Look
     no_preview: "Önizleme mevcut değil",
+    loading: "Yükleniyor…",
+    download: "İndir",
+    cloud: "Bulut",
+    google_drive: "Google Drive",
+    connect_drive: "Google Drive'a bağlan…",
+    disconnect_drive: "Google Drive bağlantısını kes",
+    drive_connected: "Google Drive bağlandı",
+    drive_disconnected: "Google Drive bağlantısı kesildi",
+    drive_cancelled: "Google Drive bağlantısı iptal edildi",
+    open_in_drive: "Google Drive'da aç",
+    uploaded: "yüklendi",
+    files_uploaded: "dosya yüklendi",
+    moved_to_trash: "Çöp Kutusu'na taşındı",
+    items_trashed: "öğe Çöp Kutusu'na taşındı",
+    too_many_attempts: "Çok fazla deneme — birkaç dakika bekleyin",
 
     // TextEdit
     empty_file: "(boş dosya)",
@@ -232,31 +264,12 @@ const DGRID = { ox: 22, oy: MENUBAR_H + 16, cw: 92, ch: 98 };
 const gridPos = (col, row) => ({ x: DGRID.ox + col * DGRID.cw, y: DGRID.oy + row * DGRID.ch });
 const gridCell = (x, y) => ({ col: Math.max(0, Math.round((x - DGRID.ox) / DGRID.cw)), row: Math.max(0, Math.round((y - DGRID.oy) / DGRID.ch)) });
 
-// ── Initial filesystem ──────────────────────────────────────────────────────
-const initFS = () => ({
-  "/": { type: "dir", children: ["Documents", "Media", "Projects", "Transfers"] },
-  "/Documents": { type: "dir", children: ["readme.txt", "notes.md"] },
-  "/Documents/readme.txt": {
-    type: "file", size: "1.2 KB", modified: "Today, 09:14", ext: "txt",
-    content:
-      "Welcome to H.İ.S.A.R.\nHızlı İletişim Saklama ve Aktarım Rezervi\n\nThis is your sandboxed transfer directory.\nDrop files here to move them across devices.",
-  },
-  "/Documents/notes.md": {
-    type: "file", size: "0.8 KB", modified: "Today, 08:00", ext: "md",
-    content: "# HISAR Notes\n\n- Phase 1: Desktop UI ✓\n- Phase 2: Backend VPS bridge\n- Phase 3: Multi-user support",
-  },
-  "/Media": { type: "dir", children: ["logo.png", "demo.mp4", "shot.jpg"] },
-  "/Media/logo.png": { type: "file", size: "340 KB", modified: "Jun 14", content: null, ext: "png" },
-  "/Media/demo.mp4": { type: "file", size: "12.4 MB", modified: "Jun 14", content: null, ext: "mp4" },
-  "/Media/shot.jpg": { type: "file", size: "2.1 MB", modified: "Jun 13", content: null, ext: "jpg" },
-  "/Projects": { type: "dir", children: ["speda", "codex"] },
-  "/Projects/speda": { type: "dir", children: ["backend.py", "config.json"] },
-  "/Projects/speda/backend.py": { type: "file", size: "4.1 KB", modified: "Jun 15", ext: "py", content: "# Speda Mark VI Backend\n# FastAPI + Anthropic SDK\n\nasync def run(context):\n    ..." },
-  "/Projects/speda/config.json": { type: "file", size: "0.9 KB", modified: "Jun 15", ext: "json", content: '{\n  "model": "claude-sonnet-4-6",\n  "max_tokens": 1000\n}' },
-  "/Projects/codex": { type: "dir", children: ["bom.txt"] },
-  "/Projects/codex/bom.txt": { type: "file", size: "0.4 KB", modified: "Jun 12", ext: "txt", content: "ESP32 CP2102 - 260TL\nCC1101 433MHz - 348TL\nPN532 NFC - 380TL\nSSD1306 OLED - 120TL\nLiPo + TP4056 - 150TL\nTotal: ~1,358 TL" },
-  "/Transfers": { type: "dir", children: [] },
-});
+// ── Filesystem state ────────────────────────────────────────────────────────
+// The `fs` map is a client-side cache of the server's vault, keyed by path.
+// Directories start unloaded and hydrate from GET /files/list on first visit;
+// `loaded: false` is what tells the Finder to show a spinner rather than an
+// empty folder.
+const initFS = () => ({ "/": { type: "dir", children: [], loaded: false } });
 
 // ── File-type metadata (label + accent for the doc icon) ────────────────────
 const EXT_META = {
@@ -284,12 +297,6 @@ const extMeta = (ext) => EXT_META[(ext || "").toLowerCase()] || EXT_META.default
 // ── Path helpers ────────────────────────────────────────────────────────────
 const joinPath = (base, name) => (base === "/" ? `/${name}` : `${base}/${name}`);
 const baseName = (p) => p.split("/").pop();
-const fmtBytes = (b) => {
-  if (b < 1024) return `${b} B`;
-  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
-  if (b < 1024 * 1024 * 1024) return `${(b / 1024 / 1024).toFixed(1)} MB`;
-  return `${(b / 1024 / 1024 / 1024).toFixed(1)} GB`;
-};
 
 /* ════════════════════════════════════════════════════════════════════════
    ICONS — hand-built SVGs (no emoji) for a native feel
@@ -459,9 +466,21 @@ const TbGlyph = ({ name }) => {
     case "search": return <svg width="14" height="14" viewBox="0 0 16 16"><circle {...p} cx="7" cy="7" r="4.2" /><line {...p} x1="10.2" y1="10.2" x2="13.5" y2="13.5" /></svg>;
     case "sidebar": return <svg width="16" height="16" viewBox="0 0 16 16"><rect {...p} x="2" y="3" width="12" height="10" rx="1.5" /><line {...p} x1="6" y1="3" x2="6" y2="13" /></svg>;
     case "info": return <svg width="16" height="16" viewBox="0 0 16 16"><circle {...p} cx="8" cy="8" r="5.5" /><circle cx="8" cy="5.4" r="0.8" fill="currentColor" /><line {...p} x1="8" y1="7.5" x2="8" y2="11" /></svg>;
+    case "download": return <svg width="16" height="16" viewBox="0 0 16 16"><path {...p} d="M8 2.5V10M5 7l3 3 3-3M3 11v1.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V11" /></svg>;
     default: return null;
   }
 };
+
+// Google Drive's triangle mark, drawn rather than fetched — the CSP on the
+// deployed app blocks remote images, and this is three paths.
+const DriveGlyph = ({ s = 16 }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden>
+    <path d="M8.4 2.6h7.2l7.2 12.5h-7.2z" fill="#ffc107" opacity=".92" />
+    <path d="M1.2 15.1L4.8 8.9 12 21.4H4.8z" fill="#1e88e5" opacity=".92" />
+    <path d="M4.8 8.9h14.4l-3.6-6.3H8.4z" fill="#4caf50" opacity=".0" />
+    <path d="M1.2 15.1h14.4l3.6 6.3H4.8z" fill="#4caf50" opacity=".92" />
+  </svg>
+);
 
 /* ════════════════════════════════════════════════════════════════════════
    STYLESHEET
@@ -777,6 +796,37 @@ const css = `
 .login-brand .s{font-size:11px;font-family:var(--mono);letter-spacing:2px;text-transform:uppercase;opacity:.65;}
 .shake{animation:shake .35s;}
 @keyframes shake{0%,100%{transform:translateX(0);}20%,60%{transform:translateX(-7px);}40%,80%{transform:translateX(7px);}}
+
+/* ── Backend-era chrome: transfer progress, async state, notifications ── */
+.spinner{display:inline-block;width:13px;height:13px;margin-right:8px;vertical-align:-2px;
+  border:1.5px solid var(--accent);border-right-color:transparent;border-radius:50%;
+  animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* Upload progress sits above the status bar — a file-transfer system that
+   gives no feedback on a multi-GB upload is not usable over a phone link. */
+.xfer{display:flex;flex-direction:column;gap:5px;padding:8px 14px 9px;
+  border-top:1px solid var(--stroke);background:var(--glass-2);}
+.xfer-top{display:flex;align-items:center;gap:10px;font-size:11px;color:var(--txt2);}
+.xfer-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--txt);}
+.xfer-pct{font-family:var(--mono);color:var(--amber-bright);white-space:nowrap;}
+.xfer-cancel{background:none;border:none;color:var(--txt3);cursor:pointer;font-size:15px;
+  line-height:1;padding:0 2px;}
+.xfer-cancel:hover{color:#ff6b6b;}
+.xfer-track{height:3px;border-radius:2px;background:var(--stroke);overflow:hidden;}
+.xfer-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--accent),var(--amber-bright));
+  transition:width .18s ease-out;}
+
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:96px;z-index:9800;
+  max-width:min(560px,86vw);padding:10px 18px;border-radius:11px;font-size:13px;
+  border:1px solid var(--stroke);background:var(--glass-2);color:var(--txt);
+  backdrop-filter:blur(22px) saturate(160%);box-shadow:0 10px 34px rgba(0,0,0,.42);
+  animation:toast-in .22s ease-out;}
+.toast.error{border-color:rgba(255,107,107,.5);color:#ff9b9b;}
+@keyframes toast-in{from{opacity:0;transform:translate(-50%,10px);}to{opacity:1;transform:translate(-50%,0);}}
+
+.ql-img{max-width:100%;max-height:100%;object-fit:contain;border-radius:6px;}
+.ql-frame{width:100%;height:100%;border:none;border-radius:6px;background:#fff;}
 `;
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -794,7 +844,8 @@ function useNow() {
 /* ════════════════════════════════════════════════════════════════════════
    Menubar
    ════════════════════════════════════════════════════════════════════════ */
-function MenuBar({ user, theme, onToggleTheme, onLogout, onNewFinder, onAbout, onSpotlight }) {
+function MenuBar({ user, theme, onToggleTheme, onLogout, onNewFinder, onAbout, onSpotlight,
+                  drive, onConnectDrive, onDisconnectDrive }) {
   const { lang, setLang, t } = useLanguage();
   const now = useNow();
   const [open, setOpen] = useState(null);
@@ -821,6 +872,10 @@ function MenuBar({ user, theme, onToggleTheme, onLogout, onNewFinder, onAbout, o
         <Sep />
         <Row label={t("system_settings")} disabled />
         <Sep />
+        {drive?.enabled && (drive.connected
+          ? <Row label={`${t("disconnect_drive")}${drive.email ? ` (${drive.email})` : ""}`} on={onDisconnectDrive} />
+          : <Row label={t("connect_drive")} on={onConnectDrive} />)}
+        {drive?.enabled && <Sep />}
         <Row label={t("lock_screen")} k="⌃⌘Q" on={onLogout} />
         <Row label={`${t("log_out")} ${user}…`} k="⇧⌘Q" on={onLogout} />
       </div>
@@ -975,7 +1030,8 @@ const SIDEBAR = [
   { glyph: "transfers", label: "Transfers", path: "/Transfers" },
 ];
 
-function FinderWindow({ win, active, fs, setFs, onFocus, onClose, onMinimize, onZoom, onChange, onOpenText, onNewFinder }) {
+function FinderWindow({ win, active, fs, loading, loadDir, notify, onError, drive, onLoadText,
+                        onFocus, onClose, onMinimize, onZoom, onChange, onOpenText, onNewFinder }) {
   const { t, lang } = useLanguage();
   const [cwd, setCwd] = useState(win.initPath || "/");
   const [history, setHistory] = useState([win.initPath || "/"]);
@@ -992,10 +1048,13 @@ function FinderWindow({ win, active, fs, setFs, onFocus, onClose, onMinimize, on
   const [dlg, setDlg] = useState(null);
   const [band, setBand] = useState(null);
   const [ql, setQl] = useState(null);
+  const [xfer, setXfer] = useState(null);   // in-flight upload, for the progress bar
   const fileInput = useRef();
   const areaRef = useRef();
+  const xferRef = useRef(null);
 
   const dir = fs[cwd];
+  const busy = loading.has(cwd);
   const items = useMemo(() => {
     const ch = (dir?.children || [])
       .map((name) => ({ name, node: fs[joinPath(cwd, name)] }))
@@ -1010,13 +1069,30 @@ function FinderWindow({ win, active, fs, setFs, onFocus, onClose, onMinimize, on
   }, [fs, cwd, dir, query]);
 
   // ── navigation ──
+  // Every directory this window shows is (re)fetched on entry — the vault is
+  // shared with agents, Forge and the owner's other devices, so a cached
+  // listing is always potentially stale.
+  useEffect(() => { loadDir(cwd); }, [cwd, loadDir]);
+
   const navigate = (path) => {
-    if (!fs[path] || fs[path].type !== "dir") return;
+    if (fs[path] && fs[path].type !== "dir") return;
     const h = [...history.slice(0, hi + 1), path];
     setHistory(h); setHi(h.length - 1); setCwd(path); setSel(new Set()); setAnchor(null); setQuery("");
   };
   const goBack = () => { if (hi > 0) { setHi(hi - 1); setCwd(history[hi - 1]); setSel(new Set()); } };
   const goFwd = () => { if (hi < history.length - 1) { setHi(hi + 1); setCwd(history[hi + 1]); setSel(new Set()); } };
+
+  // Quick Look on a text file needs its bytes; images and video stream
+  // straight from the download endpoint and need nothing fetched up front.
+  const quickLook = (name) => {
+    const path = joinPath(cwd, name);
+    const node = fs[path];
+    if (node?.type === "file" && node.content == null &&
+        TEXT_EXTS.includes((node.ext || "").toLowerCase())) {
+      onLoadText(path);
+    }
+    setQl(name);
+  };
 
   const openItem = (name) => {
     const path = joinPath(cwd, name);
@@ -1024,63 +1100,81 @@ function FinderWindow({ win, active, fs, setFs, onFocus, onClose, onMinimize, on
     if (!node) return;
     if (node.type === "dir") navigate(path);
     else if (TEXT_EXTS.includes((node.ext || "").toLowerCase())) onOpenText(path);
-    else setQl(name);
+    else quickLook(name);
   };
 
-  // ── filesystem ops (functional updates → safe with shared fs) ──
-  const doMkdir = (name) => {
+  // ── filesystem ops — every one is a server call, then a re-list ──
+  // Re-listing rather than patching state locally keeps this window honest
+  // about what the server actually did (deposits suffixed a name, Drive
+  // renamed a Google Doc, another device changed something mid-operation).
+  const doMkdir = async (name) => {
     const nm = name.trim(); if (!nm) return;
-    const path = joinPath(cwd, nm);
-    setFs((prev) => {
-      if (prev[path]) return prev;
-      return { ...prev, [cwd]: { ...prev[cwd], children: [...prev[cwd].children, nm] }, [path]: { type: "dir", children: [] } };
-    });
+    try {
+      await api.mkdir(cwd, nm);
+      await loadDir(cwd);
+      setSel(new Set([nm]));
+    } catch (err) { onError(err); }
   };
-  const doRename = (oldName, newName) => {
+
+  const doRename = async (oldName, newName) => {
     const nm = newName.trim(); if (!nm || nm === oldName) return;
-    setFs((prev) => {
-      const oldPath = joinPath(cwd, oldName), newPath = joinPath(cwd, nm);
-      if (prev[newPath]) return prev;
-      const next = { ...prev };
-      // move subtree (rename path prefixes)
-      Object.keys(prev).forEach((k) => {
-        if (k === oldPath || k.startsWith(oldPath + "/")) {
-          const nk = newPath + k.slice(oldPath.length);
-          next[nk] = prev[k];
-          delete next[k];
-        }
-      });
-      next[cwd] = { ...prev[cwd], children: prev[cwd].children.map((c) => (c === oldName ? nm : c)) };
-      return next;
-    });
-    setSel(new Set([nm]));
+    try {
+      const result = await api.rename(joinPath(cwd, oldName), nm);
+      await loadDir(cwd);
+      setSel(new Set([result?.name || nm]));
+    } catch (err) { onError(err); }
   };
-  const doDelete = (names) => {
+
+  const doDelete = async (names) => {
     if (!names.length) return;
-    setFs((prev) => {
-      const next = { ...prev };
-      names.forEach((name) => {
-        const path = joinPath(cwd, name);
-        Object.keys(prev).forEach((k) => { if (k === path || k.startsWith(path + "/")) delete next[k]; });
-      });
-      next[cwd] = { ...prev[cwd], children: prev[cwd].children.filter((c) => !names.includes(c)) };
-      return next;
-    });
     setSel(new Set());
+    try {
+      // Sequential, not parallel: the trash names files by timestamp and the
+      // server is a single small box — a burst of concurrent deletes buys
+      // nothing and makes failures harder to report.
+      for (const name of names) await api.remove(joinPath(cwd, name));
+      await loadDir(cwd);
+      notify(names.length === 1 ? t("moved_to_trash") : `${names.length} ${t("items_trashed")}`);
+    } catch (err) {
+      onError(err);
+      loadDir(cwd);
+    }
   };
-  const doUpload = (files) => {
-    setFs((prev) => {
-      const next = { ...prev };
-      const children = [...prev[cwd].children];
-      Array.from(files).forEach((file) => {
-        const ext = file.name.includes(".") ? file.name.split(".").pop() : "";
-        if (!children.includes(file.name)) children.push(file.name);
-        next[joinPath(cwd, file.name)] = { type: "file", size: fmtBytes(file.size), modified: "Just now", content: null, ext };
-      });
-      next[cwd] = { ...prev[cwd], children };
-      return next;
-    });
+
+  const doUpload = async (fileList) => {
     setDragOver(false);
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const label = files.length > 1 ? `${file.name} (${i + 1}/${files.length})` : file.name;
+      setXfer({ name: label, loaded: 0, total: file.size, pct: 0 });
+      try {
+        const task = api.upload(cwd, file, {
+          onProgress: (loaded, total) =>
+            setXfer({ name: label, loaded, total, pct: total ? loaded / total : 0 }),
+        });
+        xferRef.current = task;
+        await task;
+      } catch (err) {
+        setXfer(null);
+        xferRef.current = null;
+        onError(err);
+        await loadDir(cwd);
+        return;
+      }
+    }
+    setXfer(null);
+    xferRef.current = null;
+    await loadDir(cwd);
+    notify(files.length === 1 ? `${files[0].name} ${t("uploaded")}` : `${files.length} ${t("files_uploaded")}`);
+  };
+
+  const doDownload = (names) => {
+    // One click per file: the browser handles the transfer, and a zip endpoint
+    // would mean the server buffering multi-GB archives it has no room for.
+    names.forEach((name) => api.saveAs(joinPath(cwd, name)));
   };
 
   // ── selection ──
@@ -1133,7 +1227,7 @@ function FinderWindow({ win, active, fs, setFs, onFocus, onClose, onMinimize, on
       if (e.key === "Escape") { setCtx(null); setQl(null); return; }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a") { e.preventDefault(); setSel(new Set(items.map((i) => i.name))); return; }
       if (e.key === "Delete" || e.key === "Backspace") { if (sel.size) { e.preventDefault(); doDelete([...sel]); } return; }
-      if (e.key === " ") { if (sel.size === 1) { e.preventDefault(); setQl((q) => (q ? null : [...sel][0])); } return; }
+      if (e.key === " ") { if (sel.size === 1) { e.preventDefault(); ql ? setQl(null) : quickLook([...sel][0]); } return; }
       if (e.key === "Enter") { if (sel.size === 1) openItem([...sel][0]); return; }
       if (["ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown"].includes(e.key)) { e.preventDefault(); moveSel(e.key); }
     };
@@ -1167,6 +1261,10 @@ function FinderWindow({ win, active, fs, setFs, onFocus, onClose, onMinimize, on
         <button className={`seg${view === "list" ? " on" : ""}`} onClick={() => setView("list")}><TbGlyph name="list" /></button>
       </div>
       <button className="tb-btn" title={t("get_info")} onClick={() => setShowInfo((v) => !v)}><TbGlyph name="info" /></button>
+      <button className="tb-btn" title={t("download")} disabled={!sel.size}
+        onClick={() => doDownload([...sel].filter((n) => fs[joinPath(cwd, n)]?.type === "file"))}>
+        <TbGlyph name="download" />
+      </button>
       <button className="tb-btn" title={t("upload")} onClick={() => fileInput.current?.click()}><TbGlyph name="upload" /></button>
       <button className="tb-btn" title={t("new_folder")} onClick={() => setDlg({ type: "mkdir", value: t("untitled_folder") })}><TbGlyph name="newfolder" /></button>
       <div className={`search-wrap${searchOpen || query ? " open" : ""}`}>
@@ -1194,6 +1292,14 @@ function FinderWindow({ win, active, fs, setFs, onFocus, onClose, onMinimize, on
                     <span className="gl"><SideGlyph name={s.glyph} /></span>{t(s.label.toLowerCase())}
                   </div>
                 ))}
+                {drive?.connected && (
+                  <>
+                    <div className="side-head" style={{ marginTop: 8 }}>{t("cloud")}</div>
+                    <div className={`side-item${isDrivePath(cwd) ? " on" : ""}`} onClick={() => navigate(DRIVE_MOUNT)}>
+                      <span className="gl"><DriveGlyph /></span>{t("google_drive")}
+                    </div>
+                  </>
+                )}
                 <div className="side-head" style={{ marginTop: 8 }}>{t("tags")}</div>
                 {[["#ff5f57", "Red"], ["#febc2e", "Orange"], ["#28c840", "Green"], ["#0a84ff", "Blue"]].map(([c, n]) => (
                   <div key={n} className="side-item"><span className="side-tag" style={{ background: c }} />{t(n.toLowerCase())}</div>
@@ -1203,7 +1309,9 @@ function FinderWindow({ win, active, fs, setFs, onFocus, onClose, onMinimize, on
 
             <div className="area" ref={areaRef} onMouseDown={onAreaDown}
               onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, target: null }); }}>
-              {items.length === 0 ? (
+              {busy && items.length === 0 ? (
+                <div className="empty"><span className="spinner" />{t("loading")}</div>
+              ) : items.length === 0 ? (
                 <div className="empty">{query ? t("no_matching_items") : t("empty_folder")}</div>
               ) : view === "grid" ? (
                 <div className="grid">
@@ -1252,13 +1360,29 @@ function FinderWindow({ win, active, fs, setFs, onFocus, onClose, onMinimize, on
             )}
           </div>
 
+          {xfer && (
+            <div className="xfer no-drag">
+              <div className="xfer-top">
+                <span className="xfer-name">{xfer.name}</span>
+                <span className="xfer-pct">
+                  {api.fmtBytes(xfer.loaded)} / {api.fmtBytes(xfer.total)} · {Math.round(xfer.pct * 100)}%
+                </span>
+                <button className="xfer-cancel" title={t("cancel")}
+                  onClick={() => xferRef.current?.abort?.()}>×</button>
+              </div>
+              <div className="xfer-track"><div className="xfer-fill" style={{ width: `${xfer.pct * 100}%` }} /></div>
+            </div>
+          )}
+
           <div className="statusbar">
             <span>
               {lang === "tr"
                 ? `${items.length} ${t("items")}${sel.size ? `, ${sel.size} ${t("selected")}` : ""}`
                 : `${items.length} ${items.length === 1 ? t("item") : t("items")}${sel.size ? `, ${sel.size} ${t("selected")}` : ""}`}
             </span>
-            <span style={{ fontFamily: "var(--mono)" }}>sandbox:{cwd}</span>
+            <span style={{ fontFamily: "var(--mono)" }}>
+              {isDrivePath(cwd) ? `drive:${cwd.slice(DRIVE_MOUNT.length) || "/"}` : `sandbox:${cwd}`}
+            </span>
           </div>
 
           {dragOver && <div className="drop">{t("drop_to_upload")}</div>}
@@ -1276,7 +1400,13 @@ function FinderWindow({ win, active, fs, setFs, onFocus, onClose, onMinimize, on
             {ctx.target ? (
               <>
                 <div className="ctx-row" onClick={() => { openItem(ctx.target); setCtx(null); }}>{t("open")}</div>
-                <div className="ctx-row" onClick={() => { setQl(ctx.target); setCtx(null); }}>{t("quick_look")}<span className="menu-key">Space</span></div>
+                <div className="ctx-row" onClick={() => { quickLook(ctx.target); setCtx(null); }}>{t("quick_look")}<span className="menu-key">Space</span></div>
+                {fs[joinPath(cwd, ctx.target)]?.type === "file" && (
+                  <div className="ctx-row" onClick={() => { doDownload(sel.size ? [...sel] : [ctx.target]); setCtx(null); }}>{t("download")}</div>
+                )}
+                {fs[joinPath(cwd, ctx.target)]?.webLink && (
+                  <div className="ctx-row" onClick={() => { window.open(fs[joinPath(cwd, ctx.target)].webLink, "_blank", "noopener"); setCtx(null); }}>{t("open_in_drive")}</div>
+                )}
                 <div className="ctx-sep" />
                 <div className="ctx-row" onClick={() => { setDlg({ type: "rename", target: ctx.target, value: ctx.target }); setCtx(null); }}>{t("rename")}</div>
                 <div className="ctx-row" onClick={() => { fileInput.current?.click(); setCtx(null); }}>{t("upload_here")}</div>
@@ -1310,7 +1440,7 @@ function FinderWindow({ win, active, fs, setFs, onFocus, onClose, onMinimize, on
 
       {/* quick look */}
       {ql && fs[joinPath(cwd, ql)] && (
-        <QuickLook name={ql} node={fs[joinPath(cwd, ql)]} onClose={() => setQl(null)} />
+        <QuickLook name={ql} node={fs[joinPath(cwd, ql)]} path={joinPath(cwd, ql)} onClose={() => setQl(null)} />
       )}
     </>
   );
@@ -1343,13 +1473,26 @@ function DialogPrompt({ title, desc, initial, okLabel, onOk, onCancel }) {
 /* ════════════════════════════════════════════════════════════════════════
    Quick Look
    ════════════════════════════════════════════════════════════════════════ */
-function QuickLook({ name, node, onClose }) {
+function QuickLook({ name, node, path, onClose }) {
   const { t } = useLanguage();
   useEffect(() => {
     const k = (e) => { if (e.key === "Escape" || e.key === " ") { e.preventDefault(); onClose(); } };
     window.addEventListener("keydown", k);
     return () => window.removeEventListener("keydown", k);
   }, [onClose]);
+
+  // Media is streamed straight from the download endpoint; the session cookie
+  // rides along because it is the same origin, so no blob juggling is needed.
+  const kind = extMeta(node.ext).kind;
+  const src = path ? api.downloadUrl(path, true) : null;
+  const media = node.type === "file" && src && (
+    kind === "image" ? <img className="ql-img" src={src} alt={name} />
+    : kind === "video" ? <video className="ql-img" src={src} controls autoPlay muted />
+    : (node.ext || "").toLowerCase() === "pdf" ? <iframe className="ql-frame" src={src} title={name} />
+    : (node.ext || "").toLowerCase() === "mp3" || (node.ext || "").toLowerCase() === "wav"
+      ? <audio src={src} controls autoPlay style={{ width: "80%" }} />
+    : null
+  );
   return (
     <div className="ql-bg" onMouseDown={onClose}>
       <div className="ql" onMouseDown={(e) => e.stopPropagation()}>
@@ -1362,8 +1505,12 @@ function QuickLook({ name, node, onClose }) {
           </div>
         </div>
         <div className="ql-body">
-          {node.content ? (
+          {media ? (
+            media
+          ) : node.content ? (
             <div className="ql-pre">{node.content}</div>
+          ) : node.loadingText ? (
+            <div className="ql-blank"><span className="spinner" />{t("loading")}</div>
           ) : (
             <div className="ql-blank">
               <ItemIcon node={node} s={120} />
@@ -1530,10 +1677,30 @@ function Login({ theme, user, onLogin }) {
   const now = useNow();
   const [pwd, setPwd] = useState("");
   const [err, setErr] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const [busy, setBusy] = useState(false);
 
-  const submit = () => {
-    if (!pwd) { setErr(true); setTimeout(() => setErr(false), 400); return; }
-    onLogin(); // demo: any password
+  const fail = (message) => {
+    setErr(true);
+    setMsg(message || null);
+    setTimeout(() => setErr(false), 400);
+  };
+
+  const submit = async () => {
+    if (!pwd || busy) { if (!pwd) fail(null); return; }
+    setBusy(true);
+    setMsg(null);
+    try {
+      await api.login(pwd, user);
+      setPwd("");
+      onLogin();
+    } catch (e) {
+      // A 429 is worth naming — otherwise a rate-limited owner just sees
+      // "wrong password" and keeps making it worse.
+      fail(e?.status === 429 ? t("too_many_attempts") : e?.message);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -1549,11 +1716,13 @@ function Login({ theme, user, onLogin }) {
           <div className="login-av">{user.charAt(0).toUpperCase()}</div>
           <div className="login-user">{user}</div>
           <div className="login-pwd">
-            <input type="password" placeholder={t("enter_password")} value={pwd} autoFocus
+            <input type="password" placeholder={t("enter_password")} value={pwd} autoFocus disabled={busy}
               onChange={(e) => setPwd(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />
-            <button className="login-go" onClick={submit}>→</button>
+            <button className="login-go" onClick={submit} disabled={busy}>{busy ? "…" : "→"}</button>
           </div>
-          <div className={err ? "login-err" : "login-hint"}>{err ? t("password_required") : t("touch_id_or_password")}</div>
+          <div className={msg || err ? "login-err" : "login-hint"}>
+            {msg || (err ? t("password_required") : t("touch_id_or_password"))}
+          </div>
         </div>
         <div className="login-brand">
           <div className="n">H.İ.S.A.R.</div>
@@ -1568,11 +1737,100 @@ function Login({ theme, user, onLogin }) {
    Desktop (window manager)
    ════════════════════════════════════════════════════════════════════════ */
 function Desktop({ theme, setTheme, user, onLogout }) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const vw = typeof window !== "undefined" ? window.innerWidth : 1280;
   const vh = typeof window !== "undefined" ? window.innerHeight : 800;
 
   const [fs, setFs] = useState(initFS);
+  const [loading, setLoading] = useState(() => new Set());
+  const [toast, setToast] = useState(null);
+  // Mirror of `fs` for callbacks that must read the latest cache without
+  // taking a dependency on it (and re-creating every child handler).
+  const fsRef = useRef(fs);
+  useEffect(() => { fsRef.current = fs; }, [fs]);
+  const [drive, setDrive] = useState({ enabled: false, connected: false });
+
+  const notify = useCallback((message, kind = "info") => {
+    setToast({ message, kind, id: Date.now() });
+  }, []);
+
+  // A 401 anywhere means the session expired — drop straight to the lock
+  // screen instead of letting the desktop rot into a wall of failed requests.
+  const handleError = useCallback((err) => {
+    if (err?.status === 401) { onLogout(); return; }
+    notify(err?.message || String(err), "error");
+  }, [notify, onLogout]);
+
+  /** Hydrate one directory from the server and merge it into the cache. */
+  const loadDir = useCallback(async (path) => {
+    setLoading((s) => new Set(s).add(path));
+    try {
+      const { dirNode, nodes } = await api.listDir(path, lang);
+      setFs((prev) => {
+        const next = { ...prev };
+        // Drop cache entries for children that no longer exist server-side,
+        // so a delete made from another device disappears here too.
+        const stale = (prev[path]?.children || []).filter((c) => !dirNode.children.includes(c));
+        stale.forEach((name) => {
+          const p = joinPath(path, name);
+          Object.keys(next).forEach((k) => { if (k === p || k.startsWith(p + "/")) delete next[k]; });
+        });
+        Object.entries(nodes).forEach(([p, node]) => {
+          const old = prev[p];
+          // Keep an already-loaded subdirectory's children; the parent listing
+          // does not know them and would blank the folder out.
+          next[p] = node.type === "dir" && old?.loaded
+            ? { ...node, children: old.children, loaded: true }
+            : { ...(old || {}), ...node };
+        });
+        next[path] = dirNode;
+        return next;
+      });
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setLoading((s) => { const n = new Set(s); n.delete(path); return n; });
+    }
+  }, [lang, handleError]);
+
+  // Drive availability decides whether the mount appears in the sidebar and
+  // on the desktop at all.
+  const refreshDrive = useCallback(async () => {
+    try { setDrive(await api.driveStatus()); } catch { /* Drive is optional */ }
+  }, []);
+
+  useEffect(() => { loadDir("/"); refreshDrive(); }, [loadDir, refreshDrive]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), toast.kind === "error" ? 6000 : 3200);
+    return () => clearTimeout(id);
+  }, [toast]);
+
+  const doLogout = useCallback(async () => {
+    // Clear the cookie server-side too; dropping only the client state would
+    // leave a live session behind on a shared device.
+    try { await api.logout(); } catch { /* logging out locally regardless */ }
+    onLogout();
+  }, [onLogout]);
+
+  const connectDrive = useCallback(async () => {
+    try {
+      const ok = await api.driveConnect();
+      await refreshDrive();
+      await loadDir("/");
+      notify(ok ? t("drive_connected") : t("drive_cancelled"), ok ? "info" : "error");
+    } catch (err) { handleError(err); }
+  }, [refreshDrive, loadDir, notify, t, handleError]);
+
+  const disconnectDrive = useCallback(async () => {
+    try {
+      await api.driveDisconnect();
+      await refreshDrive();
+      await loadDir("/");
+      notify(t("drive_disconnected"));
+    } catch (err) { handleError(err); }
+  }, [refreshDrive, loadDir, notify, t, handleError]);
   const [windows, setWindows] = useState(() => {
     const w = 880, h = 560;
     return [{ id: 1, kind: "finder", initPath: "/", x: Math.round((vw - w) / 2), y: 72, w, h, z: 10, minimized: false, maximized: false }];
@@ -1593,6 +1851,19 @@ function Desktop({ theme, setTheme, user, onLogout }) {
   ]);
   const [deskSel, setDeskSel] = useState(null);
   const [deskDrag, setDeskDrag] = useState(null);
+
+  // The Drive icon appears and disappears with the connection rather than
+  // sitting there dead when Drive is not linked.
+  useEffect(() => {
+    setDeskIcons((ds) => {
+      const has = ds.some((d) => d.id === "gdrive");
+      if (drive.connected && !has) {
+        return [...ds, { id: "gdrive", label: "Google Drive", path: DRIVE_MOUNT, gdrive: true, ...gridPos(0, ds.length) }];
+      }
+      if (!drive.connected && has) return ds.filter((d) => d.id !== "gdrive");
+      return ds;
+    });
+  }, [drive.connected]);
 
   const snapToGrid = (id, fx, fy) => setDeskIcons((ds) => {
     let { col, row } = gridCell(fx, fy);
@@ -1659,7 +1930,23 @@ function Desktop({ theme, setTheme, user, onLogout }) {
     openFinder("/");
   };
 
+  /** Pull a text file's bytes into the cache the first time it is opened. */
+  const loadText = useCallback(async (path) => {
+    setFs((prev) => (prev[path] ? { ...prev, [path]: { ...prev[path], loadingText: true } } : prev));
+    try {
+      const node = fsRef.current[path];
+      const text = await api.readText(path, node?.bytes);
+      setFs((prev) => (prev[path]
+        ? { ...prev, [path]: { ...prev[path], content: text, loadingText: false } }
+        : prev));
+    } catch (err) {
+      setFs((prev) => (prev[path] ? { ...prev, [path]: { ...prev[path], loadingText: false } } : prev));
+      handleError(err);
+    }
+  }, [handleError]);
+
   const openText = useCallback((path) => {
+    if (fsRef.current[path]?.content == null) loadText(path);
     const existing = windows.find((w) => w.kind === "textedit" && w.path === path);
     if (existing) { focus(existing.id); return; }
     const n = windows.filter((w) => w.kind === "textedit").length;
@@ -1673,7 +1960,7 @@ function Desktop({ theme, setTheme, user, onLogout }) {
     }]);
     setActiveId(id);
     bounce("textedit");
-  }, [windows, vw, focus]);
+  }, [windows, vw, focus, loadText]);
 
   const closeWin = (id) => {
     setWindows((ws) => ws.filter((w) => w.id !== id));
@@ -1722,20 +2009,25 @@ function Desktop({ theme, setTheme, user, onLogout }) {
 
       <MenuBar user={user} theme={theme}
         onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
-        onLogout={onLogout} onNewFinder={() => openFinder("/")}
-        onAbout={() => openText("/Documents/readme.txt")}
+        onLogout={doLogout} onNewFinder={() => openFinder("/")}
+        drive={drive} onConnectDrive={connectDrive} onDisconnectDrive={disconnectDrive}
+        onAbout={() => openFinder("/")}
         onSpotlight={() => setSpotlight(true)} />
 
       {deskIcons.map((d) => (
         <div key={d.id} className={`desk-ic${deskSel === d.id ? " sel" : ""}${deskDrag === d.id ? " drag" : ""}`} style={{ left: d.x, top: d.y }}
           onMouseDown={dragDesk(d.id)} onDoubleClick={() => openFinder(d.path)}>
-          {d.drive ? <DriveIcon s={56} /> : <FolderIcon s={56} />}
-          <div className="lbl">{t(d.id)}</div>
+          {d.gdrive ? <DriveGlyph s={56} /> : d.drive ? <DriveIcon s={56} /> : <FolderIcon s={56} />}
+          <div className="lbl">{d.gdrive ? t("google_drive") : t(d.id)}</div>
         </div>
       ))}
 
+      {toast && <div className={`toast ${toast.kind}`}>{toast.message}</div>}
+
       {windows.map((w) => w.kind === "finder" ? (
-        <FinderWindow key={w.id} win={w} active={activeId === w.id} fs={fs} setFs={setFs}
+        <FinderWindow key={w.id} win={w} active={activeId === w.id} fs={fs}
+          loading={loading} loadDir={loadDir} notify={notify} onError={handleError}
+          drive={drive} onLoadText={loadText}
           onFocus={() => focus(w.id)} onClose={() => closeWin(w.id)} onMinimize={() => minimize(w.id)}
           onZoom={() => zoom(w.id)} onChange={(p) => change(w.id, p)}
           onOpenText={openText} onNewFinder={openFinder} />
@@ -1761,13 +2053,31 @@ export default function App() {
   const [theme, setTheme] = useState("dark");
   const [user, setUser] = useState(null);
   const [lang, setLang] = useState("tr");
-  const USERNAME = "ahmet";
+  const [booted, setBooted] = useState(false);
+  const [USERNAME, setUsername] = useState("ahmet");
+
+  // Resume an existing session cookie instead of re-prompting on every reload.
+  useEffect(() => {
+    api.me()
+      .then((who) => { setUsername(who.user); setUser(who.user); })
+      .catch(() => { /* not logged in — the lock screen is the right answer */ })
+      .finally(() => setBooted(true));
+  }, []);
 
   const t = useCallback((key) => {
     return TRANSLATIONS[lang]?.[key] || TRANSLATIONS["en"]?.[key] || key;
   }, [lang]);
 
   const value = useMemo(() => ({ lang, setLang, t }), [lang, t]);
+
+  // Hold the boot frame until the session check lands, so a logged-in owner
+  // never sees the lock screen flash on refresh.
+  if (!booted) return (
+    <div className="os" data-theme={theme}>
+      <style>{css}</style>
+      <div className="wallpaper" />
+    </div>
+  );
 
   if (!user) return (
     <LanguageContext.Provider value={value}>
