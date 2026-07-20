@@ -56,6 +56,41 @@ def test_health_needs_no_auth(client):
     assert client.get("/health").json()["status"] == "ok"
 
 
+def test_owner_name_is_public(client):
+    # The lock screen renders before any session exists, so this must answer
+    # without a cookie — otherwise the client falls back to a hardcoded name
+    # and submits it as the username, which no password can rescue.
+    r = client.get("/auth/owner")
+    assert r.status_code == 200
+    assert r.json() == {"user": "ahmet", "login_enabled": True}
+
+
+def test_login_accepts_a_multi_word_owner_name(tmp_path, monkeypatch):
+    monkeypatch.setenv("HISAR_SANDBOX_ROOT", str(tmp_path / "vault"))
+    monkeypatch.setenv("HISAR_OWNER_USERNAME", "Ahmet Erol Bayrak")
+    monkeypatch.setenv("HISAR_OWNER_PASSWORD_HASH", hash_password(PASSWORD))
+    monkeypatch.setenv("HISAR_JWT_SECRET", "test-secret-not-used-anywhere-real")
+    monkeypatch.setenv("HISAR_COOKIE_SECURE", "false")
+    monkeypatch.setenv("HISAR_STATIC_DIR", str(tmp_path / "no-dist"))
+    get_settings.cache_clear()
+    import server.auth as auth_module
+    auth_module._attempts.clear()
+
+    from server.main import create_app
+
+    with TestClient(create_app()) as c:
+        assert c.get("/auth/owner").json()["user"] == "Ahmet Erol Bayrak"
+        # The name the client just read back must authenticate…
+        assert c.post("/auth/login", json={"password": PASSWORD,
+                                           "username": "Ahmet Erol Bayrak"}).status_code == 200
+        # …case- and space-insensitively, and a stale one must not.
+        assert c.post("/auth/login", json={"password": PASSWORD,
+                                           "username": "  ahmet erol bayrak "}).status_code == 200
+        assert c.post("/auth/login", json={"password": PASSWORD,
+                                           "username": "ahmet"}).status_code == 401
+    get_settings.cache_clear()
+
+
 def test_login_rejects_wrong_password(client):
     r = client.post("/auth/login", json={"password": "hunter2"})
     assert r.status_code == 401

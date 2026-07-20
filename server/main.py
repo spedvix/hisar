@@ -77,6 +77,18 @@ def create_app() -> FastAPI:
 
     # ── owner auth ───────────────────────────────────────────────────────
 
+    @app.get("/auth/owner")
+    async def owner():
+        """The name the lock screen greets, before any session exists.
+
+        Deliberately public: it is the one thing an anonymous visitor is meant
+        to see, and the login screen renders it either way. Without this the
+        client falls back to a hardcoded name and sends it as the username,
+        which fails the comparison below for any owner named anything else.
+        """
+        s = get_settings()
+        return {"user": s.owner_username, "login_enabled": s.owner_login_enabled}
+
     @app.post("/auth/login")
     async def login(body: LoginBody, request: Request, response: Response):
         rate_limit_login(request)

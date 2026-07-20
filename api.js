@@ -78,6 +78,8 @@ export const fmtWhen = (iso, lang = "tr") => {
 export const login = (password, username) => json("/auth/login", "POST", { password, username });
 export const logout = () => request("/auth/logout", { method: "POST" });
 export const me = () => request("/auth/me");
+// Public — the lock screen needs the owner's name before a session exists.
+export const owner = () => request("/auth/owner");
 
 /* ── files ──────────────────────────────────────────────────────────── */
 

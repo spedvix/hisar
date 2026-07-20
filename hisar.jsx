@@ -2057,10 +2057,17 @@ export default function App() {
   const [USERNAME, setUsername] = useState("ahmet");
 
   // Resume an existing session cookie instead of re-prompting on every reload.
+  // When there is no session, the owner's name still has to come from the
+  // server: the lock screen submits it as the username, and a stale hardcoded
+  // fallback would fail the comparison for any owner not called "ahmet".
   useEffect(() => {
     api.me()
       .then((who) => { setUsername(who.user); setUser(who.user); })
-      .catch(() => { /* not logged in — the lock screen is the right answer */ })
+      .catch(() =>
+        api.owner()
+          .then((who) => setUsername(who.user))
+          .catch(() => { /* server unreachable — the fallback name will do */ })
+      )
       .finally(() => setBooted(true));
   }, []);
 
