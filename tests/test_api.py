@@ -243,15 +243,38 @@ def test_machine_may_write_into_forge_and_speda(client):
         assert r.status_code == 200, folder
 
 
-def test_machine_cannot_read_list_or_delete(client):
-    """Write-only is the whole security story for agent credentials."""
-    assert client.get("/files/list", headers=MACHINE, params={"path": "/"}).status_code == 403
-    assert client.get("/files/download", headers=MACHINE,
-                      params={"path": "/Documents"}).status_code == 403
+def test_machine_can_navigate_the_vault(client):
+    """The vault is a shared workspace, not a drop box.
+
+    Deposit-only access made an agent unable to find the report it filed last
+    week, check whether a folder already exists, or read a document the owner
+    asked it to work from — so it could write and never see what it wrote.
+    """
+    assert client.get("/files/list", headers=MACHINE, params={"path": "/"}).status_code == 200
+
+
+def test_machine_may_read_outside_its_write_scope(client):
+    """Reading is deliberately wider than writing: an agent can SEE the owner's
+    Documents and still cannot touch them."""
+    assert client.get("/files/list", headers=MACHINE,
+                      params={"path": "/Documents"}).status_code == 200
+
+
+def test_machine_still_cannot_destroy_or_reorganise(client):
+    """The half of the security story that has to survive read access. Delete
+    and rename are irreversible from an agent's side of the wire, so they stay
+    owner-only."""
     assert client.request("DELETE", "/files/delete", headers=MACHINE,
                           params={"path": "/Documents"}).status_code == 403
     assert client.post("/files/rename", headers=MACHINE,
                        json={"path": "/Documents", "name": "x"}).status_code == 403
+
+
+def test_machine_still_cannot_write_outside_its_scope(client):
+    """Read is wide; write is not. Unchanged by this."""
+    r = client.post("/deposit", headers=MACHINE, data={"folder": "/Documents"},
+                    files={"file": ("a.txt", io.BytesIO(b"x"), "text/plain")})
+    assert r.status_code == 403
 
 
 def test_machine_scope_is_not_prefix_confusable(client):

@@ -124,12 +124,29 @@ def current_principal(request: Request) -> Principal:
 
 
 def require_owner(principal: Principal = Depends(current_principal)) -> Principal:
-    """Read, delete, rename, download — anything that exposes or destroys."""
+    """Delete, rename, move — anything that DESTROYS or reorganises."""
     if not principal.is_owner:
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
             detail="This operation requires the owner credential.",
         )
+    return principal
+
+
+def require_reader(principal: Principal = Depends(current_principal)) -> Principal:
+    """List and download — the owner, or an agent navigating the vault.
+
+    The vault is the owner's cloud filesystem and their agents work in it
+    alongside them, so an agent that can only WRITE is close to useless: it
+    cannot find the report it filed last week, check whether a folder already
+    exists, or read a document the owner asked it to work from. Deposit-only
+    access made the vault a drop box rather than a shared workspace.
+
+    Reading is deliberately wider than writing. `authorize_write` still pins
+    machines to /SPEDA and /Forge, so an agent can SEE the owner's Documents
+    and cannot touch them, and destructive operations (delete, rename) remain
+    owner-only through `require_owner` above.
+    """
     return principal
 
 

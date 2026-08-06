@@ -15,7 +15,8 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from . import vault
-from .auth import Principal, authorize_write, current_principal, require_machine, require_owner
+from .auth import (Principal, authorize_write, current_principal, require_machine,
+                   require_owner, require_reader)
 from .config import DRIVE_MOUNT, get_settings
 from .drive import DriveEntry, get_drive, is_drive_path
 from .paths import PathError, check_name, normalize, parent_of
@@ -61,7 +62,7 @@ class RenameBody(BaseModel):
 # ── list ──────────────────────────────────────────────────────────────────
 
 @router.get("/files/list")
-async def list_files(path: str = Query("/"), principal: Principal = Depends(require_owner)):
+async def list_files(path: str = Query("/"), principal: Principal = Depends(require_reader)):
     p = normalize(path)
 
     if is_drive_path(p):
@@ -124,7 +125,7 @@ async def upload_file(
 async def download_file(
     path: str = Query(...),
     inline: bool = Query(False, description="Serve inline (Quick Look) instead of attachment"),
-    principal: Principal = Depends(require_owner),
+    principal: Principal = Depends(require_reader),
 ):
     p = normalize(path)
     disposition = "inline" if inline else "attachment"
@@ -227,5 +228,5 @@ async def deposit(
 # ── storage info ──────────────────────────────────────────────────────────
 
 @router.get("/files/usage")
-async def storage_usage(principal: Principal = Depends(require_owner)):
+async def storage_usage(principal: Principal = Depends(require_reader)):
     return vault.usage(_root())

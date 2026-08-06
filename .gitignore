@@ -35,3 +35,7 @@ __pycache__/
 
 # Local vault (never commit vault contents)
 vault/
+
+# Forge scratch (worktrees, allowlist, session state)
+.forge/
+.forge-worktrees/
