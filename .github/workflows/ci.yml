@@ -1,0 +1,132 @@
+name: CI Pipeline
+
+# Test on every branch; deploy only what passed, and only from main.
+#
+# Hisar had no automation at all: it was deployed by hand, so what was running
+# was whatever someone last remembered to pull and rebuild. That is the same
+# drift that left the Forge peers 26 commits behind their own repository.
+#
+# Nothing about the server lives in this file — it is all in Actions Secrets,
+# so a public repo never discloses the deployment. Required repo secrets:
+#   SSH_HOST      server hostname or IP
+#   SSH_USER      deploy user
+#   SSH_KEY       that user's PRIVATE deploy key
+#   SSH_PORT      SSH port (optional; defaults to 22)
+#   DEPLOY_PATH   absolute path of the clone on the server (/opt/hisar-mk1)
+#   COMPOSE_PATH  directory holding the compose file that builds it (/opt/speda)
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "**" ]
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run Pytest
+        run: python -m pytest
+
+  deploy:
+    name: Deploy to the vault host
+    needs: test                       # never deploy a red build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    concurrency:
+      group: deploy-hisar
+      cancel-in-progress: true
+
+    steps:
+      # Secrets arrive as ENV, never interpolated into the script body: a
+      # multi-line PEM expanded inline becomes an unterminated quote and the
+      # step dies of a syntax error before checking anything.
+      - name: Check deploy secrets are configured
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          missing=""
+          [ -n "$SSH_HOST" ]    || missing="$missing SSH_HOST"
+          [ -n "$SSH_USER" ]    || missing="$missing SSH_USER"
+          [ -n "$SSH_KEY" ]     || missing="$missing SSH_KEY"
+          [ -n "$DEPLOY_PATH" ] || missing="$missing DEPLOY_PATH"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repo secrets:$missing — add them under"
+            echo "::error::Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          case "$SSH_KEY" in
+            *"PRIVATE KEY"*) ;;
+            *) echo "::error::SSH_KEY does not look like a private key."
+               echo "::error::Paste the whole file including the BEGIN/END lines."
+               exit 1 ;;
+          esac
+
+      - name: SSH deploy
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          command_timeout: 20m
+          script: |
+            set -euo pipefail
+            cd "${{ secrets.DEPLOY_PATH }}"
+
+            # Mirror main exactly. .env is gitignored and survives.
+            git fetch --prune origin main
+            git reset --hard origin/main
+
+            # Hisar runs as a container built from this checkout, so a deploy
+            # is a rebuild — not a restart. The `hisar` compose profile must be
+            # named explicitly or the service is not selected at all.
+            cd "${{ secrets.COMPOSE_PATH || '/opt/speda' }}"
+            docker compose --profile hisar up -d --build hisar
+
+            # A container that starts and immediately dies still counts as
+            # "up" for a moment, so give it long enough to fail and then ask
+            # the app itself, not Docker.
+            #
+            # Probed with python, not curl or wget: the image has neither, and
+            # a health check that always fails is worse than none — it turns
+            # every good deploy red until someone stops believing it.
+            sleep 10
+            for i in 1 2 3 4 5 6; do
+              if docker compose exec -T hisar python -c \
+                   "import sys,urllib.request as u; sys.exit(0 if u.urlopen('http://127.0.0.1:8600/health',timeout=5).status==200 else 1)" \
+                   >/dev/null 2>&1; then
+                echo "hisar healthy — deployed $(git -C "${{ secrets.DEPLOY_PATH }}" log -1 --format=%h)"
+                exit 0
+              fi
+              sleep 5
+            done
+
+            echo "::error::hisar did not become healthy after deploy"
+            docker compose logs --tail 40 hisar
+            exit 1
