@@ -5,6 +5,33 @@ import { DRIVE_MOUNT, isDrivePath } from "./api.js";
 const LanguageContext = createContext();
 export const useLanguage = () => useContext(LanguageContext);
 
+// ── Responsive breakpoint hook ──────────────────────────────────────────
+// Fires on resize; components use it to switch layout modes. Stable identity
+// keeps re-renders down — only components that care about the breakpoint
+// name itself will react.
+const useResponsive = () => {
+  const [bp, setBp] = useState(() => {
+    if (typeof window === "undefined") return "desktop";
+    const w = window.innerWidth;
+    if (w <= 640) return "phone";
+    if (w <= 1024) return "tablet";
+    return "desktop";
+  });
+  useEffect(() => {
+    let raf;
+    const onResize = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const w = window.innerWidth;
+        setBp(w <= 640 ? "phone" : w <= 1024 ? "tablet" : "desktop");
+      });
+    };
+    window.addEventListener("resize", onResize);
+    return () => { window.removeEventListener("resize", onResize); cancelAnimationFrame(raf); };
+  }, []);
+  return bp;
+};
+
 const TRANSLATIONS = {
   en: {
     // Menubar
@@ -806,20 +833,20 @@ const css = `
 /* Upload progress sits above the status bar — a file-transfer system that
    gives no feedback on a multi-GB upload is not usable over a phone link. */
 .xfer{display:flex;flex-direction:column;gap:5px;padding:8px 14px 9px;
-  border-top:1px solid var(--stroke);background:var(--glass-2);}
+  border-top:.5px solid var(--sep);background:var(--mat-side);}
 .xfer-top{display:flex;align-items:center;gap:10px;font-size:11px;color:var(--txt2);}
 .xfer-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--txt);}
 .xfer-pct{font-family:var(--mono);color:var(--amber-bright);white-space:nowrap;}
-.xfer-cancel{background:none;border:none;color:var(--txt3);cursor:pointer;font-size:15px;
-  line-height:1;padding:0 2px;}
+.xfer-cancel{background:none;border:none;color:var(--txt3);cursor:pointer;font-size:18px;
+  line-height:1;padding:4px 6px;min-width:32px;min-height:32px;}
 .xfer-cancel:hover{color:#ff6b6b;}
-.xfer-track{height:3px;border-radius:2px;background:var(--stroke);overflow:hidden;}
+.xfer-track{height:3px;border-radius:2px;background:var(--sep);overflow:hidden;}
 .xfer-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--accent),var(--amber-bright));
   transition:width .18s ease-out;}
 
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:96px;z-index:9800;
   max-width:min(560px,86vw);padding:10px 18px;border-radius:11px;font-size:13px;
-  border:1px solid var(--stroke);background:var(--glass-2);color:var(--txt);
+  border:.5px solid var(--sep2);background:var(--mat);color:var(--txt);
   backdrop-filter:blur(22px) saturate(160%);box-shadow:0 10px 34px rgba(0,0,0,.42);
   animation:toast-in .22s ease-out;}
 .toast.error{border-color:rgba(255,107,107,.5);color:#ff9b9b;}
@@ -827,6 +854,189 @@ const css = `
 
 .ql-img{max-width:100%;max-height:100%;object-fit:contain;border-radius:6px;}
 .ql-frame{width:100%;height:100%;border:none;border-radius:6px;background:#fff;}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE — tablet (≤1024px) and phone (≤640px)
+   ──────────────────────────────────────────────────────────────────────────
+   The desktop metaphor adapts rather than being replaced. Windows go
+   full-width, the sidebar and info panel become overlay drawers, the dock
+   shrinks, and the menu bar condenses. Touch is the primary input on mobile
+   so tap targets are enlarged.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── Shared utility: hide-on-mobile ── */
+@media (max-width:640px){.hide-on-mobile{display:none!important;}}
+
+/* ── Tablet (≤1024px) ── */
+@media (max-width:1024px){
+  /* Menubar — tighter spacing, smaller clock */
+  .menubar{font-size:12px;padding:0 6px;gap:1px;}
+  .mb-brand{font-size:12px;padding:2px 7px;letter-spacing:.08em;}
+  .mb-item{padding:2px 6px;font-size:11px;}
+  .mb-clock{font-size:10px;padding:2px 4px;}
+  .mb-tray{padding:2px 4px;}
+
+  /* Windows — full-width, stacked */
+  .win{left:0!important;top:28px!important;width:100%!important;height:calc(100% - 28px)!important;
+    border-radius:0;border-left:none;border-right:none;}
+  .win.min{transform:scale(.18) translateY(60vh);opacity:0;pointer-events:none;}
+  .win-bar{height:44px;padding:0 0 0 10px;gap:8px;}
+  .win-bar.compact{height:34px;}
+  .win-btn{width:42px;}
+
+  /* Hide resize handles on mobile — windows are always full-width */
+  .rsz{display:none;}
+
+  /* Sidebar becomes overlay drawer */
+  .sidebar{position:absolute;top:44px;bottom:24px;left:0;z-index:50;width:220px;
+    box-shadow:4px 0 30px rgba(0,0,0,.5);}
+  .sidebar:not(.open){display:none;}
+
+  /* Info panel slides up as a bottom sheet */
+  .info{position:absolute;bottom:24px;right:0;z-index:50;width:100%;max-height:220px;
+    flex-direction:row;flex-wrap:wrap;gap:8px;padding:12px 16px;
+    border-left:none;border-top:.5px solid var(--sep);border-radius:14px 14px 0 0;
+    box-shadow:0 -6px 28px rgba(0,0,0,.35);}
+  .info:not(.open){display:none;}
+  .info-ic{display:none;}
+  .info-name{width:100%;text-align:left;font-size:13px;}
+  .info-row{width:100%;}
+  .info-pre{max-height:100px;}
+
+  /* Finder toolbar — wrap */
+  .tb{flex-wrap:wrap;gap:4px;}
+  .crumbs{order:10;flex-basis:100%;}
+  .search-wrap.open,.search-wrap:focus-within{width:120px;}
+
+  /* Grid — fewer columns */
+  .grid{grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:6px;}
+  .fitem{padding:8px 4px 6px;gap:4px;}
+  .fname{font-size:11px;max-width:72px;}
+
+  /* Dock — smaller, bottom-anchored */
+  .dock-wrap{bottom:4px;}
+  .dock{gap:3px;padding:5px 7px;border-radius:18px;}
+  .dock-ic{width:42px;height:42px;}
+  .dock-item.mini .dock-ic{width:34px;height:34px;}
+  .dock-dot{width:3px;height:3px;margin-top:2px;}
+  .dock-sep{height:32px;margin:0 3px;}
+  /* Kill magnification on tablet — it chugs */
+  .dock-item{transform:none!important;}
+
+  /* Desktop icons — use a tighter grid */
+  .desk-ic{width:72px;gap:3px;padding:5px 4px;}
+  .desk-ic .lbl{font-size:10px;max-width:64px;padding:1px 5px;}
+
+  /* Spotlight */
+  .spot{width:92vw;}
+  .spot-input input{font-size:18px;}
+
+  /* Login */
+  .login-clock .t{font-size:60px;}
+  .login-clock .d{font-size:16px;}
+}
+
+/* ── Phone (≤640px) ── */
+@media (max-width:640px){
+  /* Menubar — hide non-essential items */
+  .menubar{gap:0;padding:0 4px;justify-content:flex-start;}
+  .menubar .mb-item:nth-child(n+3){display:none;} /* hide File/Edit/View/Go */
+  .mb-brand{font-size:11px;padding:2px 6px;}
+  .mb-clock{font-size:9px;padding:1px 3px;}
+  .mb-tray{padding:1px 3px;}
+  /* Keep language toggle */
+  .mb-item.lang-toggle{display:inline!important;}
+  /* Right-side clock moves to the right with flex */
+  .mb-right{margin-left:auto;gap:1px;}
+
+  /* Windows — same full-width, but title bar shorter */
+  .win-bar{height:40px;}
+  .win-bar.compact{height:30px;}
+  .win-btn{width:38px;}
+  .win-title{font-size:11px;}
+
+  /* Sidebar narrower overlay */
+  .sidebar{top:40px;bottom:0;width:200px;}
+
+  /* Info panel slimmer */
+  .info{bottom:0;max-height:180px;padding:10px 14px;gap:6px;}
+
+  /* Toolbar — icons only where possible */
+  .tb{gap:3px;}
+  .tb-btn{padding:0 5px;min-width:26px;height:24px;font-size:11px;}
+  .seg{width:26px;height:20px;}
+  .crumbs{font-size:11px;}
+  .crumb{font-size:11px;max-width:100px;}
+
+  /* File grid — more columns for phone portrait, smaller items */
+  .grid{grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:4px;}
+  .fitem{padding:6px 2px 4px;gap:3px;border-radius:7px;}
+  .fitem .ic svg{transform:scale(.85);transform-origin:center;}
+  .fname{font-size:10px;max-width:64px;}
+
+  /* List view — compact */
+  .lrow{padding:4px 8px;font-size:11px;gap:6px;}
+  .lhead{padding:3px 8px;font-size:10px;}
+  .lrow .lmeta{font-size:10px;width:50px;}
+
+  /* Context menu — larger tap targets */
+  .ctx{min-width:160px;}
+  .ctx-row{padding:7px 10px;font-size:12px;}
+
+  /* Dialog — full-width modal */
+  .dialog{width:92vw;padding:18px;}
+  .dialog h3{font-size:13px;}
+  .dialog p{font-size:11px;}
+
+  /* Quick Look — full screen on phone */
+  .ql{width:96vw;max-height:85vh;border-radius:12px;}
+  .ql-body{padding:18px;}
+  .ql-bar{height:38px;}
+
+  /* Dock — bottom bar style */
+  .dock-wrap{bottom:2px;}
+  .dock{gap:2px;padding:4px 5px;border-radius:14px;}
+  .dock-ic{width:36px;height:36px;}
+  .dock-item.mini .dock-ic{width:28px;height:28px;}
+  .dock-sep{height:24px;margin:0 2px;}
+  /* Hide tooltips on mobile — no hover */
+  .dock-tip{display:none;}
+
+  /* Desktop icons — possibly hidden or reduced */
+  .desk-ic{width:64px;gap:2px;padding:4px 2px;}
+  .desk-ic .lbl{font-size:9px;max-width:56px;padding:1px 4px;}
+
+  /* Spotlight — full width */
+  .spot{width:96vw;border-radius:12px;}
+  .spot-input{padding:12px 16px;gap:10px;}
+  .spot-input input{font-size:16px;}
+  .spot-bg{padding-top:12vh;}
+
+  /* Login */
+  .login-clock{top:10vh;}
+  .login-clock .t{font-size:46px;}
+  .login-clock .d{font-size:14px;}
+  .login-user{font-size:17px;}
+  .login-pwd{width:200px;}
+  .login-brand{bottom:4vh;}
+  .login-brand .n{font-size:13px;}
+  .login-brand .s{font-size:10px;}
+
+  /* Toast — narrower */
+  .toast{max-width:92vw;bottom:80px;font-size:11px;padding:8px 14px;}
+
+  /* Status bar */
+  .statusbar{font-size:10px;gap:8px;height:22px;}
+}
+
+/* ── Tall narrow phone (≤400px) extra compactness ── */
+@media (max-width:400px){
+  .grid{grid-template-columns:repeat(auto-fill,minmax(68px,1fr));gap:3px;}
+  .dock-ic{width:32px;height:32px;}
+  .dock{gap:1px;padding:3px 4px;border-radius:12px;}
+  .mb-brand{font-size:10px;}
+  .login-clock .t{font-size:38px;}
+}
 `;
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -855,7 +1065,8 @@ function MenuBar({ user, theme, onToggleTheme, onLogout, onNewFinder, onAbout, o
     if (!open) return;
     const close = (e) => { if (!ref.current?.contains(e.target)) setOpen(null); };
     window.addEventListener("mousedown", close);
-    return () => window.removeEventListener("mousedown", close);
+    window.addEventListener("touchstart", close);
+    return () => { window.removeEventListener("mousedown", close); window.removeEventListener("touchstart", close); };
   }, [open]);
 
   const Row = ({ label, k, on, disabled }) => (
@@ -957,8 +1168,11 @@ function MenuBar({ user, theme, onToggleTheme, onLogout, onNewFinder, onAbout, o
    ════════════════════════════════════════════════════════════════════════ */
 function WindowShell({ win, active, compact, title, toolbar, onFocus, onClose, onMinimize, onZoom, onChange, children }) {
   const MINW = 460, MINH = 320;
+  const bp = useResponsive();
+  const isMobile = bp === "phone" || bp === "tablet";
 
   const startDrag = useCallback((e) => {
+    if (isMobile) return; // no drag on mobile — windows are full-screen
     if (e.button !== 0) return;
     if (e.target.closest("button, input, .no-drag")) return;
     onFocus();
@@ -966,9 +1180,10 @@ function WindowShell({ win, active, compact, title, toolbar, onFocus, onClose, o
     const move = (ev) => onChange({ maximized: false, x: ox + (ev.clientX - sx), y: Math.max(MENUBAR_H, oy + (ev.clientY - sy)) });
     const up = () => { document.removeEventListener("mousemove", move); document.removeEventListener("mouseup", up); };
     document.addEventListener("mousemove", move); document.addEventListener("mouseup", up);
-  }, [win.x, win.y, onChange, onFocus]);
+  }, [win.x, win.y, onChange, onFocus, isMobile]);
 
   const startResize = (dir) => (e) => {
+    if (isMobile) return; // no resize on mobile
     e.preventDefault(); e.stopPropagation(); onFocus();
     const s = { mx: e.clientX, my: e.clientY, x: win.x, y: win.y, w: win.w, h: win.h };
     const move = (ev) => {
@@ -989,30 +1204,33 @@ function WindowShell({ win, active, compact, title, toolbar, onFocus, onClose, o
       className={`win${active ? " active" : ""}${win.minimized ? " min" : ""}`}
       style={{ left: win.x, top: win.y, width: win.w, height: win.h, zIndex: win.z }}
       onMouseDown={onFocus}
+      onTouchStart={onFocus}
     >
-      <div className={`win-bar${compact ? " compact" : ""}`} onMouseDown={startDrag} onDoubleClick={onZoom}>
+      <div className={`win-bar${compact ? " compact" : ""}`} onMouseDown={startDrag} onTouchStart={startDrag} onDoubleClick={onZoom}>
         {compact ? <div className="win-title">{title}</div> : toolbar}
         <div className="win-ctrls no-drag" onMouseDown={(e) => e.stopPropagation()}>
           <button className="win-btn" title="Minimize" onClick={onMinimize}>
             <svg viewBox="0 0 10 10"><line x1="1" y1="9" x2="9" y2="9" stroke="currentColor" strokeWidth="1.2" fill="none" /></svg>
           </button>
-          <button className="win-btn" title={win.maximized ? "Restore" : "Maximize"} onClick={onZoom}>
-            {win.maximized ? (
-              <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1">
-                <rect x="1.5" y="3.5" width="5" height="5" />
-                <path d="M3.5 3.5V1.5h5v5H6.5" />
-              </svg>
-            ) : (
-              <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2"><rect x="1.5" y="1.5" width="7" height="7" /></svg>
-            )}
-          </button>
+          {!isMobile && (
+            <button className="win-btn" title={win.maximized ? "Restore" : "Maximize"} onClick={onZoom}>
+              {win.maximized ? (
+                <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1">
+                  <rect x="1.5" y="3.5" width="5" height="5" />
+                  <path d="M3.5 3.5V1.5h5v5H6.5" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2"><rect x="1.5" y="1.5" width="7" height="7" /></svg>
+              )}
+            </button>
+          )}
           <button className="win-btn close" title="Close" onClick={onClose}>
             <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" /></svg>
           </button>
         </div>
       </div>
       <div className="win-body">{children}</div>
-      {["n", "s", "e", "w", "ne", "nw", "se", "sw"].map((d) => (
+      {!isMobile && ["n", "s", "e", "w", "ne", "nw", "se", "sw"].map((d) => (
         <div key={d} className={`rsz rsz-${d}`} onMouseDown={startResize(d)} />
       ))}
     </div>
@@ -1033,6 +1251,8 @@ const SIDEBAR = [
 function FinderWindow({ win, active, fs, loading, loadDir, notify, onError, drive, onLoadText,
                         onFocus, onClose, onMinimize, onZoom, onChange, onOpenText, onNewFinder }) {
   const { t, lang } = useLanguage();
+  const bp = useResponsive();
+  const isMobile = bp === "phone" || bp === "tablet";
   const [cwd, setCwd] = useState(win.initPath || "/");
   const [history, setHistory] = useState([win.initPath || "/"]);
   const [hi, setHi] = useState(0);
@@ -1041,8 +1261,9 @@ function FinderWindow({ win, active, fs, loading, loadDir, notify, onError, driv
   const [view, setView] = useState("grid");
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
-  const [showInfo, setShowInfo] = useState(true);
-  const [showSidebar, setShowSidebar] = useState(true);
+  // On mobile, sidebar and info panel start hidden — tap toggles them as overlays
+  const [showInfo, setShowInfo] = useState(!isMobile);
+  const [showSidebar, setShowSidebar] = useState(!isMobile);
   const [dragOver, setDragOver] = useState(false);
   const [ctx, setCtx] = useState(null);
   const [dlg, setDlg] = useState(null);
@@ -1189,12 +1410,18 @@ function FinderWindow({ win, active, fs, loading, loadDir, notify, onError, driv
   };
 
   const onAreaDown = (e) => {
-    if (e.button !== 0 || e.target.closest(".fitem,.lrow,.ctx,.lhead")) return;
+    // Touch events don't have .button; gate only for mouse
+    const isTouch = e.type === "touchstart";
+    if (!isTouch && e.button !== 0) return;
+    if (e.target.closest(".fitem,.lrow,.ctx,.lhead")) return;
     setSel(new Set()); setAnchor(null); setCtx(null);
-    const sx = e.clientX, sy = e.clientY;
+    const sx = isTouch ? e.touches[0].clientX : e.clientX;
+    const sy = isTouch ? e.touches[0].clientY : e.clientY;
     const move = (ev) => {
-      const x = Math.min(sx, ev.clientX), y = Math.min(sy, ev.clientY);
-      const w = Math.abs(ev.clientX - sx), h = Math.abs(ev.clientY - sy);
+      const cx = ev.touches ? ev.touches[0].clientX : ev.clientX;
+      const cy = ev.touches ? ev.touches[0].clientY : ev.clientY;
+      const x = Math.min(sx, cx), y = Math.min(sy, cy);
+      const w = Math.abs(cx - sx), h = Math.abs(cy - sy);
       setBand({ x, y, w, h });
       if (w < 3 && h < 3) return;
       const r = { left: x, top: y, right: x + w, bottom: y + h };
@@ -1205,8 +1432,13 @@ function FinderWindow({ win, active, fs, loading, loadDir, notify, onError, driv
       });
       setSel(next);
     };
-    const up = () => { setBand(null); document.removeEventListener("mousemove", move); document.removeEventListener("mouseup", up); };
+    const up = () => {
+      setBand(null);
+      document.removeEventListener("mousemove", move); document.removeEventListener("mouseup", up);
+      document.removeEventListener("touchmove", move); document.removeEventListener("touchend", up);
+    };
     document.addEventListener("mousemove", move); document.addEventListener("mouseup", up);
+    document.addEventListener("touchmove", move, { passive: false }); document.addEventListener("touchend", up);
   };
 
   const moveSel = (key) => {
@@ -1285,7 +1517,9 @@ function FinderWindow({ win, active, fs, loading, loadDir, notify, onError, driv
           onDrop={(e) => { e.preventDefault(); doUpload(e.dataTransfer.files); }}>
           <div className="win-body" style={{ flex: 1 }}>
             {showSidebar && (
-              <div className="sidebar no-drag">
+              <>
+                {isMobile && <div style={{ position: "absolute", inset: 0, zIndex: 49 }} onMouseDown={() => setShowSidebar(false)} onTouchStart={() => setShowSidebar(false)} />}
+                <div className={`sidebar no-drag${showSidebar ? " open" : ""}`} onClick={isMobile ? () => setShowSidebar(false) : undefined}>
                 <div className="side-head">{t("favorites")}</div>
                 {SIDEBAR.map((s) => (
                   <div key={s.path} className={`side-item${cwd === s.path ? " on" : ""}`} onClick={() => navigate(s.path)}>
@@ -1304,10 +1538,11 @@ function FinderWindow({ win, active, fs, loading, loadDir, notify, onError, driv
                 {[["#ff5f57", "Red"], ["#febc2e", "Orange"], ["#28c840", "Green"], ["#0a84ff", "Blue"]].map(([c, n]) => (
                   <div key={n} className="side-item"><span className="side-tag" style={{ background: c }} />{t(n.toLowerCase())}</div>
                 ))}
-              </div>
+                </div>
+              </>
             )}
 
-            <div className="area" ref={areaRef} onMouseDown={onAreaDown}
+            <div className="area" ref={areaRef} onMouseDown={onAreaDown} onTouchStart={onAreaDown}
               onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, target: null }); }}>
               {busy && items.length === 0 ? (
                 <div className="empty"><span className="spinner" />{t("loading")}</div>
@@ -1343,20 +1578,29 @@ function FinderWindow({ win, active, fs, loading, loadDir, notify, onError, driv
             </div>
 
             {showInfo && selNode && (
-              <div className="info no-drag">
-                <div className="info-ic"><ItemIcon node={selNode} s={64} /></div>
-                <div className="info-name">{selName}</div>
-                <div className="info-sep" />
-                <div className="info-row"><span className="info-k">{t("kind")}</span><span className="info-v">{selNode.type === "dir" ? t("folder") : `${(selNode.ext || "file").toUpperCase()} ${t("document")}`}</span></div>
-                {selNode.type === "dir" ? (
-                  <div className="info-row"><span className="info-k">{t("items")}</span><span className="info-v">{selNode.children.length}</span></div>
-                ) : (
-                  <div className="info-row"><span className="info-k">{t("size")}</span><span className="info-v">{selNode.size}</span></div>
-                )}
-                {selNode.modified && <div className="info-row"><span className="info-k">{t("modified")}</span><span className="info-v" style={{ color: "var(--amber-bright)", fontFamily: "var(--mono)" }}>{selNode.modified}</span></div>}
-                <div className="info-row"><span className="info-k">{t("where")}</span><span className="info-v">{cwd}</span></div>
-                {selNode.content && (<><div className="info-sep" /><div className="info-pre">{selNode.content}</div></>)}
-              </div>
+              <>
+                {isMobile && <div style={{ position: "absolute", inset: 0, zIndex: 49 }} onMouseDown={() => setShowInfo(false)} onTouchStart={() => setShowInfo(false)} />}
+                <div className={`info no-drag${showInfo ? " open" : ""}`}>
+                  {isMobile && (
+                    <button className="win-btn close" style={{ position: "absolute", top: 6, right: 6, width: 28, height: 28, zIndex: 2 }}
+                      onClick={() => setShowInfo(false)}>
+                      <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" /></svg>
+                    </button>
+                  )}
+                  <div className="info-ic"><ItemIcon node={selNode} s={64} /></div>
+                  <div className="info-name">{selName}</div>
+                  <div className="info-sep" />
+                  <div className="info-row"><span className="info-k">{t("kind")}</span><span className="info-v">{selNode.type === "dir" ? t("folder") : `${(selNode.ext || "file").toUpperCase()} ${t("document")}`}</span></div>
+                  {selNode.type === "dir" ? (
+                    <div className="info-row"><span className="info-k">{t("items")}</span><span className="info-v">{selNode.children.length}</span></div>
+                  ) : (
+                    <div className="info-row"><span className="info-k">{t("size")}</span><span className="info-v">{selNode.size}</span></div>
+                  )}
+                  {selNode.modified && <div className="info-row"><span className="info-k">{t("modified")}</span><span className="info-v" style={{ color: "var(--amber-bright)", fontFamily: "var(--mono)" }}>{selNode.modified}</span></div>}
+                  <div className="info-row"><span className="info-k">{t("where")}</span><span className="info-v">{cwd}</span></div>
+                  {selNode.content && (<><div className="info-sep" /><div className="info-pre">{selNode.content}</div></>)}
+                </div>
+              </>
             )}
           </div>
 
@@ -1395,8 +1639,8 @@ function FinderWindow({ win, active, fs, loading, loadDir, notify, onError, driv
       {/* context menu */}
       {ctx && (
         <>
-          <div style={{ position: "fixed", inset: 0, zIndex: 9650 }} onMouseDown={() => setCtx(null)} onContextMenu={(e) => { e.preventDefault(); setCtx(null); }} />
-          <div className="ctx" style={{ left: Math.min(ctx.x, window.innerWidth - 200), top: Math.min(ctx.y, window.innerHeight - 220) }}>
+          <div style={{ position: "fixed", inset: 0, zIndex: 9650 }} onMouseDown={() => setCtx(null)} onTouchStart={() => setCtx(null)} onContextMenu={(e) => { e.preventDefault(); setCtx(null); }} />
+          <div className="ctx" style={{ left: Math.max(0, Math.min(ctx.x, window.innerWidth - 200)), top: Math.max(0, Math.min(ctx.y, window.innerHeight - 220)) }}>
             {ctx.target ? (
               <>
                 <div className="ctx-row" onClick={() => { openItem(ctx.target); setCtx(null); }}>{t("open")}</div>
@@ -1455,7 +1699,7 @@ function DialogPrompt({ title, desc, initial, okLabel, onOk, onCancel }) {
   const ref = useRef();
   useEffect(() => { ref.current?.focus(); ref.current?.select(); }, []);
   return (
-    <div className="dialog-bg" onMouseDown={onCancel}>
+    <div className="dialog-bg" onMouseDown={onCancel} onTouchStart={onCancel}>
       <div className="dialog" onMouseDown={(e) => e.stopPropagation()}>
         <h3>{title}</h3>
         <p>{desc}</p>
@@ -1494,7 +1738,7 @@ function QuickLook({ name, node, path, onClose }) {
     : null
   );
   return (
-    <div className="ql-bg" onMouseDown={onClose}>
+    <div className="ql-bg" onMouseDown={onClose} onTouchStart={onClose}>
       <div className="ql" onMouseDown={(e) => e.stopPropagation()}>
         <div className="ql-bar">
           <div className="t">{name}</div>
@@ -1564,7 +1808,7 @@ function Spotlight({ fs, onClose, onOpen }) {
   const choose = (r) => { onOpen(r.path, r.node); onClose(); };
 
   return (
-    <div className="spot-bg" onMouseDown={onClose}>
+    <div className="spot-bg" onMouseDown={onClose} onTouchStart={onClose}>
       <div className="spot" onMouseDown={(e) => e.stopPropagation()}>
         <div className="spot-input">
           <span className="gl"><TopGlyph name="search" /></span>
@@ -1602,6 +1846,8 @@ function Spotlight({ fs, onClose, onOpen }) {
    ════════════════════════════════════════════════════════════════════════ */
 function Dock({ running, bouncing, minimized, onOpenFinder, onToggleTheme, onRestore }) {
   const { t } = useLanguage();
+  const bp = useResponsive();
+  const isMobile = bp === "phone" || bp === "tablet";
   const [mx, setMx] = useState(null);
   const ref = useRef();
   const BASE = 54, MAX = 30, RANGE = 90;
@@ -1648,15 +1894,15 @@ function Dock({ running, bouncing, minimized, onOpenFinder, onToggleTheme, onRes
   return (
     <div className="dock-wrap">
       <div className="dock" ref={ref}
-        onMouseMove={(e) => { const r = ref.current.getBoundingClientRect(); setMx(e.clientX - r.left); }}
-        onMouseLeave={() => setMx(null)}>
+        onMouseMove={isMobile ? undefined : (e) => { const r = ref.current.getBoundingClientRect(); setMx(e.clientX - r.left); }}
+        onMouseLeave={isMobile ? undefined : () => setMx(null)}>
         {entries.map((en, i) => {
           if (en.sep) return <div key={en.id} className="dock-sep" />;
-          const grow = scaleFor(centers[i]);
+          const grow = isMobile ? 0 : scaleFor(centers[i]);
           return (
             <div key={en.id}
               className={`dock-item${en.run ? " run" : ""}${en.mini ? " mini" : ""}${bouncing === en.id ? " bounce" : ""}`}
-              style={{ transform: `translateY(${-grow * 0.45}px) scale(${1 + grow / BASE})` }}
+              style={{ transform: isMobile ? undefined : `translateY(${-grow * 0.45}px) scale(${1 + grow / BASE})` }}
               onClick={en.on}>
               <div className="dock-tip">{en.label}</div>
               <div className="dock-ic">{en.icon}</div>
@@ -1738,6 +1984,8 @@ function Login({ theme, user, onLogin }) {
    ════════════════════════════════════════════════════════════════════════ */
 function Desktop({ theme, setTheme, user, onLogout }) {
   const { t, lang } = useLanguage();
+  const bp = useResponsive();
+  const isMobile = bp === "phone" || bp === "tablet";
   const vw = typeof window !== "undefined" ? window.innerWidth : 1280;
   const vh = typeof window !== "undefined" ? window.innerHeight : 800;
 
@@ -1867,8 +2115,9 @@ function Desktop({ theme, setTheme, user, onLogout }) {
 
   const snapToGrid = (id, fx, fy) => setDeskIcons((ds) => {
     let { col, row } = gridCell(fx, fy);
-    const maxCol = Math.max(0, Math.floor((vw - DGRID.ox - 84) / DGRID.cw));
-    const maxRow = Math.max(0, Math.floor((vh - DGRID.oy - 70) / DGRID.ch));
+    const lvw = window.innerWidth, lvh = window.innerHeight;
+    const maxCol = Math.max(0, Math.floor((lvw - DGRID.ox - 84) / DGRID.cw));
+    const maxRow = Math.max(0, Math.floor((lvh - DGRID.oy - 70) / DGRID.ch));
     col = Math.min(col, maxCol); row = Math.min(row, maxRow);
     const taken = new Set(ds.filter((d) => d.id !== id).map((d) => { const c = gridCell(d.x, d.y); return c.col + ":" + c.row; }));
     let guard = 0;
@@ -1877,6 +2126,7 @@ function Desktop({ theme, setTheme, user, onLogout }) {
   });
 
   const dragDesk = (id) => (e) => {
+    if (isMobile) return;
     if (e.button !== 0) return;
     e.stopPropagation();
     setDeskSel(id);
@@ -1885,17 +2135,21 @@ function Desktop({ theme, setTheme, user, onLogout }) {
     if (!start) return;
     const sx = e.clientX, sy = e.clientY, ox = start.x, oy = start.y;
     let last = { x: ox, y: oy };
+    const lvw = window.innerWidth, lvh = window.innerHeight;
     const move = (ev) => {
-      last = { x: Math.max(0, Math.min(vw - 84, ox + (ev.clientX - sx))), y: Math.max(MENUBAR_H + 4, Math.min(vh - 96, oy + (ev.clientY - sy))) };
+      last = { x: Math.max(0, Math.min(lvw - 84, ox + (ev.clientX - sx))), y: Math.max(MENUBAR_H + 4, Math.min(lvh - 96, oy + (ev.clientY - sy))) };
       setDeskIcons((ds) => ds.map((d) => (d.id === id ? { ...d, ...last } : d)));
     };
     const up = () => {
       document.removeEventListener("mousemove", move);
+      document.removeEventListener("touchmove", move);
       document.removeEventListener("mouseup", up);
+      document.removeEventListener("touchend", up);
       setDeskDrag(null);
       snapToGrid(id, last.x, last.y);
     };
     document.addEventListener("mousemove", move); document.addEventListener("mouseup", up);
+    document.addEventListener("touchmove", move); document.addEventListener("touchend", up);
   };
 
   const focus = useCallback((id) => {
@@ -1908,17 +2162,19 @@ function Desktop({ theme, setTheme, user, onLogout }) {
 
   const openFinder = useCallback((initPath = "/") => {
     const n = windows.filter((w) => w.kind === "finder").length;
-    const w = 880, h = 560;
+    const w = isMobile ? vw : 880, h = isMobile ? (vh - MENUBAR_H) : 560;
     const id = idRef.current++;
     zRef.current += 1;
     setWindows((ws) => [...ws, {
       id, kind: "finder", initPath,
-      x: Math.round((vw - w) / 2) + n * 28, y: 72 + n * 28, w, h,
-      z: zRef.current, minimized: false, maximized: false,
+      x: isMobile ? 0 : Math.round((vw - w) / 2) + n * 28,
+      y: isMobile ? MENUBAR_H : 72 + n * 28,
+      w, h,
+      z: zRef.current, minimized: false, maximized: isMobile,
     }]);
     setActiveId(id);
     bounce("finder");
-  }, [windows, vw]);
+  }, [windows, vw, vh, isMobile, bounce]);
 
   // Dock Finder icon: focus the front Finder if visible, restore one if all are
   // minimized, else open a fresh window.
@@ -1950,17 +2206,19 @@ function Desktop({ theme, setTheme, user, onLogout }) {
     const existing = windows.find((w) => w.kind === "textedit" && w.path === path);
     if (existing) { focus(existing.id); return; }
     const n = windows.filter((w) => w.kind === "textedit").length;
-    const w = 560, h = 460;
+    const w = isMobile ? vw : 560, h = isMobile ? (vh - MENUBAR_H) : 460;
     const id = idRef.current++;
     zRef.current += 1;
     setWindows((ws) => [...ws, {
       id, kind: "textedit", path,
-      x: Math.round((vw - w) / 2) + 40 + n * 26, y: 110 + n * 26, w, h,
-      z: zRef.current, minimized: false, maximized: false,
+      x: isMobile ? 0 : Math.round((vw - w) / 2) + 40 + n * 26,
+      y: isMobile ? MENUBAR_H : 110 + n * 26,
+      w, h,
+      z: zRef.current, minimized: false, maximized: isMobile,
     }]);
     setActiveId(id);
     bounce("textedit");
-  }, [windows, vw, focus, loadText]);
+  }, [windows, vw, vh, isMobile, focus, loadText, bounce]);
 
   const closeWin = (id) => {
     setWindows((ws) => ws.filter((w) => w.id !== id));
@@ -2005,7 +2263,7 @@ function Desktop({ theme, setTheme, user, onLogout }) {
   return (
     <div className="os" data-theme={theme}>
       <style>{css}</style>
-      <div className="wallpaper" onMouseDown={() => setDeskSel(null)} />
+      <div className="wallpaper" onMouseDown={() => setDeskSel(null)} onTouchStart={() => setDeskSel(null)} />
 
       <MenuBar user={user} theme={theme}
         onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
@@ -2014,7 +2272,7 @@ function Desktop({ theme, setTheme, user, onLogout }) {
         onAbout={() => openFinder("/")}
         onSpotlight={() => setSpotlight(true)} />
 
-      {deskIcons.map((d) => (
+      {!isMobile && deskIcons.map((d) => (
         <div key={d.id} className={`desk-ic${deskSel === d.id ? " sel" : ""}${deskDrag === d.id ? " drag" : ""}`} style={{ left: d.x, top: d.y }}
           onMouseDown={dragDesk(d.id)} onDoubleClick={() => openFinder(d.path)}>
           {d.gdrive ? <DriveGlyph s={56} /> : d.drive ? <DriveIcon s={56} /> : <FolderIcon s={56} />}
